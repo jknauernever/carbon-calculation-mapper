@@ -16,6 +16,8 @@ export const MapInterface = () => {
   const [tokenLoading, setTokenLoading] = useState(true);
   const [address, setAddress] = useState('');
   const [drawingMode, setDrawingMode] = useState(false);
+  const [drawingPoints, setDrawingPoints] = useState<[number, number][]>([]);
+  const [currentMarkers, setCurrentMarkers] = useState<mapboxgl.Marker[]>([]);
   
   const { selectedProperty, createProperty, calculateCarbon, loading, calculationLoading } = useProperty();
 
@@ -49,6 +51,105 @@ export const MapInterface = () => {
     fetchMapboxToken();
   }, []);
 
+  const clearMap = () => {
+    if (!map.current) return;
+    
+    // Remove all markers
+    currentMarkers.forEach(marker => marker.remove());
+    setCurrentMarkers([]);
+    
+    // Remove polygon layer if it exists
+    if (map.current.getLayer('polygon-fill')) {
+      map.current.removeLayer('polygon-fill');
+    }
+    if (map.current.getLayer('polygon-outline')) {
+      map.current.removeLayer('polygon-outline');
+    }
+    if (map.current.getSource('polygon')) {
+      map.current.removeSource('polygon');
+    }
+    
+    setDrawingPoints([]);
+    setDrawingMode(false);
+    toast("Map cleared");
+  };
+
+  const addPolygonToMap = (coordinates: [number, number][]) => {
+    if (!map.current || coordinates.length < 3) return;
+
+    // Close the polygon by adding the first point at the end
+    const closedCoordinates = [...coordinates, coordinates[0]];
+
+    // Add polygon source and layers
+    if (!map.current.getSource('polygon')) {
+      map.current.addSource('polygon', {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          geometry: {
+            type: 'Polygon',
+            coordinates: [closedCoordinates]
+          },
+          properties: {}
+        }
+      });
+
+      // Add fill layer
+      map.current.addLayer({
+        id: 'polygon-fill',
+        type: 'fill',
+        source: 'polygon',
+        paint: {
+          'fill-color': '#22c55e',
+          'fill-opacity': 0.3
+        }
+      });
+
+      // Add outline layer
+      map.current.addLayer({
+        id: 'polygon-outline',
+        type: 'line',
+        source: 'polygon',
+        paint: {
+          'line-color': '#22c55e',
+          'line-width': 3
+        }
+      });
+    } else {
+      // Update existing source
+      const source = map.current.getSource('polygon') as mapboxgl.GeoJSONSource;
+      source.setData({
+        type: 'Feature',
+        geometry: {
+          type: 'Polygon',
+          coordinates: [closedCoordinates]
+        },
+        properties: {}
+      });
+    }
+  };
+
+  const calculatePolygonArea = (coordinates: [number, number][]) => {
+    // Simple area calculation using shoelace formula (approximation for small areas)
+    if (coordinates.length < 3) return 0;
+    
+    let area = 0;
+    const n = coordinates.length;
+    
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      area += coordinates[i][0] * coordinates[j][1];
+      area -= coordinates[j][0] * coordinates[i][1];
+    }
+    
+    area = Math.abs(area) / 2;
+    
+    // Convert from degree-squared to hectares (very rough approximation)
+    // 1 degree ≈ 111 km at equator, so 1 sq degree ≈ 12321 sq km
+    const hectares = area * 12321 * 100; // Convert to hectares
+    return hectares;
+  };
+
   const initializeMap = (token?: string) => {
     const tokenToUse = token || mapboxToken;
     if (!mapContainer.current || !tokenToUse) return;
@@ -71,7 +172,28 @@ export const MapInterface = () => {
 
       // Add click handler for property selection
       map.current.on('click', async (e) => {
-        if (!drawingMode) {
+        if (drawingMode) {
+          // Add point to drawing
+          const newPoints = [...drawingPoints, [e.lngLat.lng, e.lngLat.lat] as [number, number]];
+          setDrawingPoints(newPoints);
+          
+          // Add visual marker for the point
+          const marker = new mapboxgl.Marker({ 
+            color: '#22c55e',
+            scale: 1.5
+          })
+            .setLngLat(e.lngLat)
+            .addTo(map.current!);
+          
+          setCurrentMarkers(prev => [...prev, marker]);
+          
+          // If we have 3+ points, draw the polygon
+          if (newPoints.length >= 3) {
+            addPolygonToMap(newPoints);
+          }
+          
+          toast(`Point ${newPoints.length} added. ${newPoints.length >= 3 ? 'Polygon created!' : `Need ${3 - newPoints.length} more points.`}`);
+        } else {
           // Create a mock selected area for demo
           const mockArea = Math.random() * 5 + 1; // 1-6 hectares
           
@@ -88,19 +210,44 @@ export const MapInterface = () => {
             area_hectares: mockArea,
           });
           
-          new mapboxgl.Marker({ color: '#22c55e' })
+          const marker = new mapboxgl.Marker({ color: '#22c55e' })
             .setLngLat(e.lngLat)
             .addTo(map.current!);
             
+          setCurrentMarkers(prev => [...prev, marker]);
           toast(`Property saved! Area: ${mockArea.toFixed(2)} hectares`);
         }
       });
 
-      toast("Map initialized! Click anywhere to select a property.");
+      toast("Map initialized! Click to select properties or enable Draw Boundary mode.");
     } catch (error) {
       console.error('Map initialization error:', error);
       toast.error("Failed to initialize map. Please check your Mapbox token.");
     }
+  };
+
+  const finishDrawing = async () => {
+    if (drawingPoints.length < 3) {
+      toast.error("Need at least 3 points to create a property");
+      return;
+    }
+
+    const area = calculatePolygonArea(drawingPoints);
+    const centerLat = drawingPoints.reduce((sum, p) => sum + p[1], 0) / drawingPoints.length;
+    const centerLng = drawingPoints.reduce((sum, p) => sum + p[0], 0) / drawingPoints.length;
+
+    // Create property from drawn polygon
+    await createProperty({
+      name: `Drawn Property at ${centerLat.toFixed(4)}, ${centerLng.toFixed(4)}`,
+      geometry: {
+        type: 'Polygon',
+        coordinates: [[...drawingPoints, drawingPoints[0]]] // Close the polygon
+      },
+      area_hectares: area,
+    });
+
+    toast(`Property created! Area: ${area.toFixed(2)} hectares`);
+    setDrawingMode(false);
   };
 
   const handleAddressSearch = async () => {
@@ -195,15 +342,47 @@ export const MapInterface = () => {
                 Upload Boundary
               </Button>
 
-              {/* Draw Boundary */}
+              {/* Clear Map */}
               <Button 
-                variant={drawingMode ? "default" : "outline"} 
+                variant="outline" 
                 className="w-full justify-start"
-                onClick={() => setDrawingMode(!drawingMode)}
+                onClick={clearMap}
               >
                 <Square className="w-4 h-4 mr-2" />
-                Draw Boundary
+                Clear Map
               </Button>
+
+              {/* Draw Boundary */}
+              <div className="space-y-2">
+                <Button 
+                  variant={drawingMode ? "default" : "outline"} 
+                  className="w-full justify-start"
+                  onClick={() => setDrawingMode(!drawingMode)}
+                >
+                  <Square className="w-4 h-4 mr-2" />
+                  {drawingMode ? 'Stop Drawing' : 'Draw Boundary'}
+                </Button>
+                
+                {drawingMode && (
+                  <div className="text-xs text-muted-foreground pl-6">
+                    Click map to add points. Need 3+ points for polygon.
+                    {drawingPoints.length > 0 && (
+                      <div className="mt-1">
+                        Points: {drawingPoints.length}
+                        {drawingPoints.length >= 3 && (
+                          <Button 
+                            size="sm" 
+                            className="ml-2 h-6"
+                            onClick={finishDrawing}
+                          >
+                            Finish
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
 
