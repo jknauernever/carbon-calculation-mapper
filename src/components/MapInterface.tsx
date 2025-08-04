@@ -293,7 +293,6 @@ export const MapInterface = () => {
 
     toast(`Property created! Area: ${area.toFixed(2)} hectares`);
     setDrawingMode(false);
-    setDrawingPoints([]);
   };
 
   const handleAddressSearch = async () => {
