@@ -19,7 +19,7 @@ export const MapInterface = () => {
   const [drawingPoints, setDrawingPoints] = useState<[number, number][]>([]);
   const [currentMarkers, setCurrentMarkers] = useState<mapboxgl.Marker[]>([]);
   
-  const { selectedProperty, createProperty, calculateCarbon, loading, calculationLoading } = useProperty();
+  const { selectedProperty, createProperty, calculateCarbon, selectProperty, loading, calculationLoading } = useProperty();
 
   // Fetch Mapbox token from Supabase secrets
   useEffect(() => {
@@ -276,7 +276,7 @@ export const MapInterface = () => {
     const centerLng = drawingPoints.reduce((sum, p) => sum + p[0], 0) / drawingPoints.length;
 
     // Create property from drawn polygon
-    await createProperty({
+    const newProperty = await createProperty({
       name: `Drawn Property at ${centerLat.toFixed(4)}, ${centerLng.toFixed(4)}`,
       geometry: {
         type: 'Polygon',
@@ -285,8 +285,15 @@ export const MapInterface = () => {
       area_hectares: area,
     });
 
+    // Select the newly created property and calculate carbon
+    if (newProperty) {
+      selectProperty(newProperty);
+      await calculateCarbon(newProperty);
+    }
+
     toast(`Property created! Area: ${area.toFixed(2)} hectares`);
     setDrawingMode(false);
+    setDrawingPoints([]);
   };
 
   const handleAddressSearch = async () => {
