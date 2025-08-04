@@ -19,7 +19,7 @@ export const MapInterface = () => {
   const [drawingPoints, setDrawingPoints] = useState<[number, number][]>([]);
   const [currentMarkers, setCurrentMarkers] = useState<mapboxgl.Marker[]>([]);
   
-  const { selectedProperty, createProperty, calculateCarbon, selectProperty, loading, calculationLoading } = useProperty();
+  const { selectedProperty, createProperty, calculateCarbon, selectProperty, carbonCalculation, loading, calculationLoading } = useProperty();
 
   // Fetch Mapbox token from Supabase secrets
   useEffect(() => {
@@ -446,6 +446,14 @@ export const MapInterface = () => {
                     <span>Resolution:</span>
                     <span className="font-medium">10m pixels</span>
                   </div>
+                  {carbonCalculation && (
+                    <div className="border-t pt-2 mt-2">
+                      <div className="flex justify-between">
+                        <span>Carbon Storage:</span>
+                        <span className="font-medium text-primary">{carbonCalculation.total_co2e.toFixed(1)} t CO₂e</span>
+                      </div>
+                    </div>
+                  )}
                   <Button 
                     className="w-full mt-4" 
                     size="sm"
