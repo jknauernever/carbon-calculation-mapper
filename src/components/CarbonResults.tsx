@@ -1,0 +1,170 @@
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { TreePine, Wheat, Mountain, Download, FileText } from "lucide-react";
+
+interface CarbonData {
+  totalCO2e: number;
+  aboveGroundBiomass: number;
+  belowGroundBiomass: number;
+  soilOrganicCarbon: number;
+  area: number;
+}
+
+const mockData: CarbonData = {
+  totalCO2e: 847.3,
+  aboveGroundBiomass: 312.1,
+  belowGroundBiomass: 124.8,
+  soilOrganicCarbon: 410.4,
+  area: 2.34
+};
+
+export const CarbonResults = () => {
+  const { totalCO2e, aboveGroundBiomass, belowGroundBiomass, soilOrganicCarbon, area } = mockData;
+  const carbonPerHa = totalCO2e / area;
+
+  const carbonPools = [
+    {
+      name: "Soil Organic Carbon",
+      value: soilOrganicCarbon,
+      percentage: (soilOrganicCarbon / totalCO2e) * 100,
+      icon: Mountain,
+      color: "bg-amber-500",
+      description: "Carbon stored in soil organic matter"
+    },
+    {
+      name: "Above-Ground Biomass", 
+      value: aboveGroundBiomass,
+      percentage: (aboveGroundBiomass / totalCO2e) * 100,
+      icon: TreePine,
+      color: "bg-green-500",
+      description: "Carbon in trees, shrubs, and vegetation"
+    },
+    {
+      name: "Below-Ground Biomass",
+      value: belowGroundBiomass, 
+      percentage: (belowGroundBiomass / totalCO2e) * 100,
+      icon: Wheat,
+      color: "bg-green-700",
+      description: "Carbon in roots and underground biomass"
+    }
+  ];
+
+  return (
+    <div className="max-w-7xl mx-auto px-6 py-12">
+      <div className="text-center mb-8">
+        <h2 className="text-3xl font-bold text-foreground mb-4">Carbon Storage Results</h2>
+        <p className="text-muted-foreground max-w-2xl mx-auto">
+          Detailed breakdown of CO₂ equivalent storage across all carbon pools on your selected property.
+        </p>
+      </div>
+
+      <div className="grid lg:grid-cols-3 gap-6 mb-8">
+        {/* Total Carbon Summary */}
+        <Card className="lg:col-span-1 border-primary/20 bg-gradient-earth">
+          <CardHeader className="text-center pb-4">
+            <CardTitle className="text-2xl text-primary">Total Carbon Storage</CardTitle>
+          </CardHeader>
+          <CardContent className="text-center space-y-4">
+            <div>
+              <div className="text-4xl font-bold text-primary mb-2">
+                {totalCO2e.toLocaleString()}
+              </div>
+              <div className="text-sm text-muted-foreground">tonnes CO₂e</div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="bg-white/50 rounded-lg p-3">
+                <div className="font-semibold text-primary">{area} ha</div>
+                <div className="text-muted-foreground">Total Area</div>
+              </div>
+              <div className="bg-white/50 rounded-lg p-3">
+                <div className="font-semibold text-primary">{carbonPerHa.toFixed(1)}</div>
+                <div className="text-muted-foreground">CO₂e/ha</div>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-4">
+              <Button className="flex-1" size="sm">
+                <Download className="w-4 h-4 mr-2" />
+                PDF Report
+              </Button>
+              <Button variant="outline" size="sm">
+                <FileText className="w-4 h-4 mr-2" />
+                CSV Data
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Carbon Pool Breakdown */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Carbon Pool Breakdown</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {carbonPools.map((pool, index) => {
+              const Icon = pool.icon;
+              return (
+                <div key={index} className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg ${pool.color}`}>
+                        <Icon className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <div className="font-medium">{pool.name}</div>
+                        <div className="text-sm text-muted-foreground">{pool.description}</div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-semibold">{pool.value.toFixed(1)} t CO₂e</div>
+                      <div className="text-sm text-muted-foreground">{pool.percentage.toFixed(1)}%</div>
+                    </div>
+                  </div>
+                  <Progress value={pool.percentage} className="h-2" />
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Methodology */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Calculation Methodology</CardTitle>
+        </CardHeader>
+        <CardContent className="grid md:grid-cols-3 gap-6 text-sm">
+          <div className="space-y-2">
+            <h4 className="font-semibold text-primary">Data Sources</h4>
+            <ul className="space-y-1 text-muted-foreground">
+              <li>• Sentinel-2 NDVI (10m resolution)</li>
+              <li>• Copernicus Land Cover (10m)</li>
+              <li>• SoilGrids soil carbon data</li>
+              <li>• IPCC carbon conversion factors</li>
+            </ul>
+          </div>
+          <div className="space-y-2">
+            <h4 className="font-semibold text-primary">Calculation Models</h4>
+            <ul className="space-y-1 text-muted-foreground">
+              <li>• NDVI-to-biomass regression for forests</li>
+              <li>• Allometric equations for AGB/BGB</li>
+              <li>• Soil carbon density interpolation</li>
+              <li>• 3.67 multiplier for CO₂ equivalent</li>
+            </ul>
+          </div>
+          <div className="space-y-2">
+            <h4 className="font-semibold text-primary">Accuracy & Validation</h4>
+            <ul className="space-y-1 text-muted-foreground">
+              <li>• ±15% uncertainty for biomass estimates</li>
+              <li>• ±25% uncertainty for soil carbon</li>
+              <li>• Ground-truth validation ongoing</li>
+              <li>• Peer-reviewed methodologies</li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
