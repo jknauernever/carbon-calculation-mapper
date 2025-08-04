@@ -2,25 +2,29 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { TreePine, Wheat, Mountain, Download, FileText } from "lucide-react";
-
-interface CarbonData {
-  totalCO2e: number;
-  aboveGroundBiomass: number;
-  belowGroundBiomass: number;
-  soilOrganicCarbon: number;
-  area: number;
-}
-
-const mockData: CarbonData = {
-  totalCO2e: 847.3,
-  aboveGroundBiomass: 312.1,
-  belowGroundBiomass: 124.8,
-  soilOrganicCarbon: 410.4,
-  area: 2.34
-};
+import { useProperty } from "@/hooks/useProperty";
 
 export const CarbonResults = () => {
-  const { totalCO2e, aboveGroundBiomass, belowGroundBiomass, soilOrganicCarbon, area } = mockData;
+  const { selectedProperty, carbonCalculation } = useProperty();
+
+  if (!selectedProperty || !carbonCalculation) {
+    return (
+      <div className="max-w-7xl mx-auto px-6 py-12">
+        <div className="text-center">
+          <h2 className="text-3xl font-bold text-foreground mb-4">Carbon Storage Results</h2>
+          <p className="text-muted-foreground max-w-2xl mx-auto">
+            Select a property and calculate its carbon storage to see detailed results here.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const totalCO2e = carbonCalculation.total_co2e;
+  const aboveGroundBiomass = carbonCalculation.above_ground_biomass;
+  const belowGroundBiomass = carbonCalculation.below_ground_biomass;
+  const soilOrganicCarbon = carbonCalculation.soil_organic_carbon;
+  const area = selectedProperty.area_hectares;
   const carbonPerHa = totalCO2e / area;
 
   const carbonPools = [

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Search, MapPin, Upload, Square } from "lucide-react";
 import { toast } from "sonner";
+import { useProperty } from "@/hooks/useProperty";
 
 // For demo purposes - in production, get this from Supabase secrets
 const DEMO_TOKEN = 'pk.eyJ1IjoiZGVtb3VzZXIiLCJhIjoiY2wwMDAwMDAwMDAwMDAwMDBjazAwMDAwMDAwMDAifQ.demo';
@@ -15,8 +16,9 @@ export const MapInterface = () => {
   const map = useRef<mapboxgl.Map | null>(null);
   const [mapboxToken, setMapboxToken] = useState('');
   const [address, setAddress] = useState('');
-  const [selectedArea, setSelectedArea] = useState<number | null>(null);
   const [drawingMode, setDrawingMode] = useState(false);
+  
+  const { selectedProperty, createProperty, calculateCarbon, loading, calculationLoading } = useProperty();
 
   const initializeMap = () => {
     if (!mapContainer.current || !mapboxToken) return;
@@ -38,17 +40,29 @@ export const MapInterface = () => {
       );
 
       // Add click handler for property selection
-      map.current.on('click', (e) => {
+      map.current.on('click', async (e) => {
         if (!drawingMode) {
           // Create a mock selected area for demo
           const mockArea = Math.random() * 5 + 1; // 1-6 hectares
-          setSelectedArea(mockArea);
+          
+          // Create GeoJSON point geometry
+          const geometry = {
+            type: 'Point',
+            coordinates: [e.lngLat.lng, e.lngLat.lat]
+          };
+          
+          // Create property in database
+          await createProperty({
+            name: `Property at ${e.lngLat.lat.toFixed(4)}, ${e.lngLat.lng.toFixed(4)}`,
+            geometry,
+            area_hectares: mockArea,
+          });
           
           new mapboxgl.Marker({ color: '#22c55e' })
             .setLngLat(e.lngLat)
             .addTo(map.current!);
             
-          toast(`Property selected! Area: ${mockArea.toFixed(2)} hectares`);
+          toast(`Property saved! Area: ${mockArea.toFixed(2)} hectares`);
         }
       });
 
@@ -59,14 +73,25 @@ export const MapInterface = () => {
     }
   };
 
-  const handleAddressSearch = () => {
+  const handleAddressSearch = async () => {
     if (!address.trim()) {
       toast.error("Please enter an address");
       return;
     }
     // Mock geocoding for demo
     const mockArea = Math.random() * 10 + 2;
-    setSelectedArea(mockArea);
+    
+    // Create property from address search
+    await createProperty({
+      name: address,
+      address: address,
+      geometry: {
+        type: 'Point',
+        coordinates: [-122.4194, 37.7749] // Mock coordinates
+      },
+      area_hectares: mockArea,
+    });
+    
     toast(`Found property: ${address}. Area: ${mockArea.toFixed(2)} hectares`);
   };
 
@@ -163,8 +188,8 @@ export const MapInterface = () => {
             </CardContent>
           </Card>
 
-          {/* Selected Area Info */}
-          {selectedArea && (
+          {/* Selected Property Info */}
+          {selectedProperty && (
             <Card className="border-primary/20 bg-primary/5">
               <CardHeader>
                 <CardTitle className="text-lg text-primary">Selected Property</CardTitle>
@@ -173,14 +198,19 @@ export const MapInterface = () => {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span>Area:</span>
-                    <span className="font-medium">{selectedArea.toFixed(2)} ha</span>
+                    <span className="font-medium">{selectedProperty.area_hectares.toFixed(2)} ha</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Resolution:</span>
                     <span className="font-medium">10m pixels</span>
                   </div>
-                  <Button className="w-full mt-4" size="sm">
-                    Calculate Carbon Storage
+                  <Button 
+                    className="w-full mt-4" 
+                    size="sm"
+                    onClick={() => calculateCarbon(selectedProperty)}
+                    disabled={calculationLoading}
+                  >
+                    {calculationLoading ? 'Calculating...' : 'Calculate Carbon Storage'}
                   </Button>
                 </div>
               </CardContent>

@@ -14,7 +14,83 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      carbon_calculations: {
+        Row: {
+          above_ground_biomass: number
+          below_ground_biomass: number
+          calculation_method: string
+          created_at: string
+          data_sources: Json | null
+          id: string
+          property_id: string
+          soil_organic_carbon: number
+          total_co2e: number
+        }
+        Insert: {
+          above_ground_biomass: number
+          below_ground_biomass: number
+          calculation_method?: string
+          created_at?: string
+          data_sources?: Json | null
+          id?: string
+          property_id: string
+          soil_organic_carbon: number
+          total_co2e: number
+        }
+        Update: {
+          above_ground_biomass?: number
+          below_ground_biomass?: number
+          calculation_method?: string
+          created_at?: string
+          data_sources?: Json | null
+          id?: string
+          property_id?: string
+          soil_organic_carbon?: number
+          total_co2e?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "carbon_calculations_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      properties: {
+        Row: {
+          address: string | null
+          area_hectares: number
+          created_at: string
+          geometry: Json
+          id: string
+          name: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          address?: string | null
+          area_hectares: number
+          created_at?: string
+          geometry: Json
+          id?: string
+          name?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          address?: string | null
+          area_hectares?: number
+          created_at?: string
+          geometry?: Json
+          id?: string
+          name?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
