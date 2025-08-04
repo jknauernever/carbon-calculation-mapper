@@ -170,61 +170,76 @@ export const MapInterface = () => {
         'top-right'
       );
 
-      // Add click handler for property selection
-      map.current.on('click', async (e) => {
-        if (drawingMode) {
-          // Add point to drawing
-          const newPoints = [...drawingPoints, [e.lngLat.lng, e.lngLat.lat] as [number, number]];
-          setDrawingPoints(newPoints);
-          
-          // Add visual marker for the point
-          const marker = new mapboxgl.Marker({ 
-            color: '#22c55e',
-            scale: 1.5
-          })
-            .setLngLat(e.lngLat)
-            .addTo(map.current!);
-          
-          setCurrentMarkers(prev => [...prev, marker]);
-          
-          // If we have 3+ points, draw the polygon
-          if (newPoints.length >= 3) {
-            addPolygonToMap(newPoints);
-          }
-          
-          toast(`Point ${newPoints.length} added. ${newPoints.length >= 3 ? 'Polygon created!' : `Need ${3 - newPoints.length} more points.`}`);
-        } else {
-          // Create a mock selected area for demo
-          const mockArea = Math.random() * 5 + 1; // 1-6 hectares
-          
-          // Create GeoJSON point geometry
-          const geometry = {
-            type: 'Point',
-            coordinates: [e.lngLat.lng, e.lngLat.lat]
-          };
-          
-          // Create property in database
-          await createProperty({
-            name: `Property at ${e.lngLat.lat.toFixed(4)}, ${e.lngLat.lng.toFixed(4)}`,
-            geometry,
-            area_hectares: mockArea,
-          });
-          
-          const marker = new mapboxgl.Marker({ color: '#22c55e' })
-            .setLngLat(e.lngLat)
-            .addTo(map.current!);
-            
-          setCurrentMarkers(prev => [...prev, marker]);
-          toast(`Property saved! Area: ${mockArea.toFixed(2)} hectares`);
-        }
-      });
-
+      // Map click handler will be added in separate useEffect
       toast("Map initialized! Click to select properties or enable Draw Boundary mode.");
     } catch (error) {
       console.error('Map initialization error:', error);
       toast.error("Failed to initialize map. Please check your Mapbox token.");
     }
   };
+
+  // Add click handler in separate useEffect to ensure it uses current state
+  useEffect(() => {
+    if (!map.current) return;
+
+    const handleMapClick = async (e: mapboxgl.MapMouseEvent) => {
+      if (drawingMode) {
+        // Add point to drawing
+        const newPoints = [...drawingPoints, [e.lngLat.lng, e.lngLat.lat] as [number, number]];
+        setDrawingPoints(newPoints);
+        
+        // Add visual marker for the point
+        const marker = new mapboxgl.Marker({ 
+          color: '#22c55e',
+          scale: 1.5
+        })
+          .setLngLat(e.lngLat)
+          .addTo(map.current!);
+        
+        setCurrentMarkers(prev => [...prev, marker]);
+        
+        // If we have 3+ points, draw the polygon
+        if (newPoints.length >= 3) {
+          addPolygonToMap(newPoints);
+        }
+        
+        toast(`Point ${newPoints.length} added. ${newPoints.length >= 3 ? 'Polygon created!' : `Need ${3 - newPoints.length} more points.`}`);
+      } else {
+        // Create a mock selected area for demo
+        const mockArea = Math.random() * 5 + 1; // 1-6 hectares
+        
+        // Create GeoJSON point geometry
+        const geometry = {
+          type: 'Point',
+          coordinates: [e.lngLat.lng, e.lngLat.lat]
+        };
+        
+        // Create property in database
+        await createProperty({
+          name: `Property at ${e.lngLat.lat.toFixed(4)}, ${e.lngLat.lng.toFixed(4)}`,
+          geometry,
+          area_hectares: mockArea,
+        });
+        
+        const marker = new mapboxgl.Marker({ color: '#22c55e' })
+          .setLngLat(e.lngLat)
+          .addTo(map.current!);
+          
+        setCurrentMarkers(prev => [...prev, marker]);
+        toast(`Property saved! Area: ${mockArea.toFixed(2)} hectares`);
+      }
+    };
+
+    // Remove existing listener and add new one
+    map.current.off('click', handleMapClick);
+    map.current.on('click', handleMapClick);
+
+    return () => {
+      if (map.current) {
+        map.current.off('click', handleMapClick);
+      }
+    };
+  }, [drawingMode, drawingPoints, createProperty, currentMarkers]);
 
   const finishDrawing = async () => {
     if (drawingPoints.length < 3) {
