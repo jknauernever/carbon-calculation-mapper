@@ -7,24 +7,54 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Search, MapPin, Upload, Square } from "lucide-react";
 import { toast } from "sonner";
 import { useProperty } from "@/hooks/useProperty";
-
-// For demo purposes - in production, get this from Supabase secrets
-const DEMO_TOKEN = 'pk.eyJ1IjoiZGVtb3VzZXIiLCJhIjoiY2wwMDAwMDAwMDAwMDAwMDBjazAwMDAwMDAwMDAifQ.demo';
+import { supabase } from "@/integrations/supabase/client";
 
 export const MapInterface = () => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [mapboxToken, setMapboxToken] = useState('');
+  const [tokenLoading, setTokenLoading] = useState(true);
   const [address, setAddress] = useState('');
   const [drawingMode, setDrawingMode] = useState(false);
   
   const { selectedProperty, createProperty, calculateCarbon, loading, calculationLoading } = useProperty();
 
-  const initializeMap = () => {
-    if (!mapContainer.current || !mapboxToken) return;
+  // Fetch Mapbox token from Supabase secrets
+  useEffect(() => {
+    const fetchMapboxToken = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('get-mapbox-token');
+        
+        if (error) {
+          console.error('Error fetching Mapbox token:', error);
+          toast.error("Could not load map configuration");
+          setTokenLoading(false);
+          return;
+        }
+        
+        if (data?.token) {
+          setMapboxToken(data.token);
+          initializeMap(data.token);
+        } else {
+          toast.error("Mapbox token not configured");
+        }
+      } catch (error) {
+        console.error('Error:', error);
+        toast.error("Failed to initialize map");
+      } finally {
+        setTokenLoading(false);
+      }
+    };
+
+    fetchMapboxToken();
+  }, []);
+
+  const initializeMap = (token?: string) => {
+    const tokenToUse = token || mapboxToken;
+    if (!mapContainer.current || !tokenToUse) return;
 
     try {
-      mapboxgl.accessToken = mapboxToken;
+      mapboxgl.accessToken = tokenToUse;
       
       map.current = new mapboxgl.Map({
         container: mapContainer.current,
@@ -95,13 +125,6 @@ export const MapInterface = () => {
     toast(`Found property: ${address}. Area: ${mockArea.toFixed(2)} hectares`);
   };
 
-  const handleTokenSubmit = () => {
-    if (!mapboxToken.trim()) {
-      toast.error("Please enter your Mapbox token");
-      return;
-    }
-    initializeMap();
-  };
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-12">
@@ -112,30 +135,26 @@ export const MapInterface = () => {
         </p>
       </div>
 
-      {!map.current && (
+      {tokenLoading && (
+        <Card className="mb-6 border-primary/20 bg-primary/5">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-center">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mr-3"></div>
+              <p className="text-muted-foreground">Loading map configuration...</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {!tokenLoading && !map.current && (
         <Card className="mb-6 border-destructive/20 bg-destructive/5">
           <CardHeader>
-            <CardTitle className="text-destructive">Mapbox Token Required</CardTitle>
+            <CardTitle className="text-destructive">Map Configuration Error</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
-              To use the map, please enter your Mapbox public token. Get one at{' '}
-              <a href="https://mapbox.com/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                mapbox.com
-              </a>
+            <p className="text-sm text-muted-foreground">
+              Could not load the map. Please check if the Mapbox token is properly configured in the project settings.
             </p>
-            <div className="flex gap-2">
-              <Input
-                type="password"
-                placeholder="pk.eyJ1Ijoi..."
-                value={mapboxToken}
-                onChange={(e) => setMapboxToken(e.target.value)}
-                className="flex-1"
-              />
-              <Button onClick={handleTokenSubmit}>
-                Initialize Map
-              </Button>
-            </div>
           </CardContent>
         </Card>
       )}
