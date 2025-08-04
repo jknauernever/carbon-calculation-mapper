@@ -75,24 +75,47 @@ export const MapInterface = () => {
   };
 
   const addPolygonToMap = (coordinates: [number, number][]) => {
-    if (!map.current || coordinates.length < 3) return;
+    if (!map.current || coordinates.length < 3) {
+      console.log('Cannot add polygon: insufficient points or no map', coordinates.length);
+      return;
+    }
+
+    console.log('Adding polygon to map with coordinates:', coordinates);
 
     // Close the polygon by adding the first point at the end
     const closedCoordinates = [...coordinates, coordinates[0]];
+    console.log('Closed coordinates:', closedCoordinates);
 
-    // Add polygon source and layers
-    if (!map.current.getSource('polygon')) {
+    const polygonGeoJSON = {
+      type: 'Feature' as const,
+      geometry: {
+        type: 'Polygon' as const,
+        coordinates: [closedCoordinates]
+      },
+      properties: {}
+    };
+
+    console.log('Polygon GeoJSON:', polygonGeoJSON);
+
+    try {
+      // Remove existing polygon if it exists
+      if (map.current.getLayer('polygon-fill')) {
+        map.current.removeLayer('polygon-fill');
+      }
+      if (map.current.getLayer('polygon-outline')) {
+        map.current.removeLayer('polygon-outline');
+      }
+      if (map.current.getSource('polygon')) {
+        map.current.removeSource('polygon');
+      }
+
+      // Add new polygon source
       map.current.addSource('polygon', {
         type: 'geojson',
-        data: {
-          type: 'Feature',
-          geometry: {
-            type: 'Polygon',
-            coordinates: [closedCoordinates]
-          },
-          properties: {}
-        }
+        data: polygonGeoJSON
       });
+
+      console.log('Added polygon source');
 
       // Add fill layer
       map.current.addLayer({
@@ -105,6 +128,8 @@ export const MapInterface = () => {
         }
       });
 
+      console.log('Added polygon fill layer');
+
       // Add outline layer
       map.current.addLayer({
         id: 'polygon-outline',
@@ -115,17 +140,12 @@ export const MapInterface = () => {
           'line-width': 3
         }
       });
-    } else {
-      // Update existing source
-      const source = map.current.getSource('polygon') as mapboxgl.GeoJSONSource;
-      source.setData({
-        type: 'Feature',
-        geometry: {
-          type: 'Polygon',
-          coordinates: [closedCoordinates]
-        },
-        properties: {}
-      });
+
+      console.log('Added polygon outline layer');
+      toast('Polygon displayed on map!');
+    } catch (error) {
+      console.error('Error adding polygon to map:', error);
+      toast.error('Failed to display polygon on map');
     }
   };
 
@@ -183,9 +203,12 @@ export const MapInterface = () => {
     if (!map.current) return;
 
     const handleMapClick = async (e: mapboxgl.MapMouseEvent) => {
+      console.log('Map clicked, drawingMode:', drawingMode, 'current points:', drawingPoints.length);
+      
       if (drawingMode) {
         // Add point to drawing
         const newPoints = [...drawingPoints, [e.lngLat.lng, e.lngLat.lat] as [number, number]];
+        console.log('Adding new point, total points:', newPoints.length);
         setDrawingPoints(newPoints);
         
         // Add visual marker for the point
@@ -200,6 +223,7 @@ export const MapInterface = () => {
         
         // If we have 3+ points, draw the polygon
         if (newPoints.length >= 3) {
+          console.log('Drawing polygon with', newPoints.length, 'points');
           addPolygonToMap(newPoints);
         }
         
@@ -286,7 +310,6 @@ export const MapInterface = () => {
     
     toast(`Found property: ${address}. Area: ${mockArea.toFixed(2)} hectares`);
   };
-
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-12">
