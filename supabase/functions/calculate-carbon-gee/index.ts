@@ -315,6 +315,7 @@ async function generateGEETileUrl(layerId: string, bbox: number[]): Promise<stri
       }
       
       console.log(`✅ Service account loaded for project: ${serviceAccount.project_id}`);
+      console.log(`✅ Service account email: ${serviceAccount.client_email}`);
     } catch (parseError) {
       console.error('❌ Failed to parse GEE service account JSON:', parseError);
       throw new Error(`Invalid service account JSON format: ${parseError.message}`);
