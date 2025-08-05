@@ -10,6 +10,7 @@ import { GEELayerToggle } from "./GEELayerToggle";
 import { CarbonResults } from "./CarbonResults";
 import { GEEDataVisualization } from "./GEEDataVisualization";
 import { NDVITimeSeriesPanel } from "./NDVITimeSeriesPanel";
+import { TestGEEHardcoded } from "./TestGEEHardcoded";
 import { supabase } from "@/integrations/supabase/client";
 
 interface CarbonCalculation {
@@ -553,7 +554,10 @@ export const MapInterface = () => {
             )}
             
             {activePanel === 'ndvi' && (
-              <NDVITimeSeriesPanel selectedCoordinates={clickedCoordinates} />
+              <div className="space-y-4">
+                <TestGEEHardcoded />
+                <NDVITimeSeriesPanel selectedCoordinates={clickedCoordinates} />
+              </div>
             )}
           </div>
         )}
