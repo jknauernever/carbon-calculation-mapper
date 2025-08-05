@@ -4,11 +4,12 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, Square, RotateCcw, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Square, RotateCcw, ChevronLeft, ChevronRight, TrendingUp, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { GEELayerToggle } from "./GEELayerToggle";
 import { CarbonResults } from "./CarbonResults";
 import { GEEDataVisualization } from "./GEEDataVisualization";
+import { NDVITimeSeriesPanel } from "./NDVITimeSeriesPanel";
 import { supabase } from "@/integrations/supabase/client";
 
 interface CarbonCalculation {
@@ -36,6 +37,8 @@ export const MapInterface = () => {
   const [mapboxToken, setMapboxToken] = useState<string>('');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeLayers, setActiveLayers] = useState<Record<string, { enabled: boolean; opacity: number }>>({});
+  const [clickedCoordinates, setClickedCoordinates] = useState<[number, number] | null>(null);
+  const [activePanel, setActivePanel] = useState<'carbon' | 'ndvi'>('carbon');
 
   // Initialize map with Mapbox token from Supabase
   useEffect(() => {
@@ -106,6 +109,9 @@ export const MapInterface = () => {
   };
 
   const handleMapClick = (e: mapboxgl.MapMouseEvent) => {
+    // Always capture coordinates for NDVI analysis
+    setClickedCoordinates([e.lngLat.lng, e.lngLat.lat]);
+    
     if (!drawingMode) return;
 
     const { lng, lat } = e.lngLat;
@@ -484,15 +490,47 @@ export const MapInterface = () => {
       {/* Left Sidebar */}
       <div className={`${sidebarCollapsed ? 'w-12' : 'w-80'} transition-all duration-300 bg-card border-r border-border flex flex-col`}>
         {/* Sidebar Header */}
-        <div className="p-4 border-b border-border flex items-center justify-between">
+        <div className="p-4 border-b border-border flex flex-col">
           {!sidebarCollapsed && (
-            <h2 className="text-lg font-semibold text-foreground">Data Layers</h2>
+            <>
+              <div className="flex gap-2 mb-4">
+                <Button
+                  variant={activePanel === 'carbon' ? 'default' : 'outline'}
+                  onClick={() => setActivePanel('carbon')}
+                  className="flex-1"
+                  size="sm"
+                >
+                  Carbon
+                </Button>
+                <Button
+                  variant={activePanel === 'ndvi' ? 'default' : 'outline'}
+                  onClick={() => setActivePanel('ndvi')}
+                  className="flex-1"
+                  size="sm"
+                >
+                  <TrendingUp className="h-4 w-4 mr-1" />
+                  NDVI
+                </Button>
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-foreground">
+                  {activePanel === 'carbon' ? 'Data Layers' : 'NDVI Analysis'}
+                </h2>
+              </div>
+              
+              {activePanel === 'ndvi' && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Click on map to select coordinates
+                </p>
+              )}
+            </>
           )}
           <Button
             variant="ghost"
             size="sm"
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="p-2"
+            className="p-2 self-end"
           >
             {sidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
           </Button>
@@ -501,10 +539,16 @@ export const MapInterface = () => {
         {/* Sidebar Content */}
         {!sidebarCollapsed && (
           <div className="flex-1 overflow-y-auto p-4">
-            <GEELayerToggle
-              onLayerToggle={handleLayerToggle}
-              onLayerOpacityChange={handleLayerOpacityChange}
-            />
+            {activePanel === 'carbon' && (
+              <GEELayerToggle
+                onLayerToggle={handleLayerToggle}
+                onLayerOpacityChange={handleLayerOpacityChange}
+              />
+            )}
+            
+            {activePanel === 'ndvi' && (
+              <NDVITimeSeriesPanel selectedCoordinates={clickedCoordinates} />
+            )}
           </div>
         )}
       </div>
@@ -589,7 +633,7 @@ export const MapInterface = () => {
       </div>
 
       {/* Right Panel - Selected Area Info */}
-      {selectedArea && (
+      {activePanel === 'carbon' && selectedArea && (
         <div className="w-96 bg-card border-l border-border p-4 overflow-y-auto">
           <Card>
             <CardHeader>
@@ -640,6 +684,19 @@ export const MapInterface = () => {
               )}
             </CardContent>
           </Card>
+        </div>
+      )}
+      
+      {/* NDVI Placeholder Panel */}
+      {activePanel === 'ndvi' && !selectedArea && (
+        <div className="w-96 bg-card border-l border-border p-4 overflow-y-auto flex items-center justify-center">
+          <div className="text-center">
+            <MapPin className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-medium mb-2">NDVI Time Series</h3>
+            <p className="text-muted-foreground text-sm">
+              Use the NDVI panel to analyze vegetation health over time. Click on the map or enter coordinates manually.
+            </p>
+          </div>
         </div>
       )}
     </div>
