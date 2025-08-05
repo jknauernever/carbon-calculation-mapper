@@ -492,92 +492,55 @@ async function createJWT(header: any, payload: any, privateKey: string): Promise
 async function createNDVIImage(authToken: string, bbox: number[]): Promise<string> {
   console.log('🌱 Creating NDVI from Sentinel-2 data...');
   
-  // Create a simplified approach using direct API calls
+  // Use a more direct approach - create an image directly using Earth Engine asset IDs
   const mapRequest = {
     "expression": {
-      "functionInvocationValue": {
-        "functionName": "Image.normalizedDifference",
-        "arguments": {
-          "this": {
-            "functionInvocationValue": {
-              "functionName": "ImageCollection.median",
-              "arguments": {
-                "this": {
-                  "functionInvocationValue": {
-                    "functionName": "ImageCollection.filter", 
-                    "arguments": {
-                      "this": {
-                        "functionInvocationValue": {
-                          "functionName": "ImageCollection.filterDate",
-                          "arguments": {
-                            "this": {
-                              "functionInvocationValue": {
-                                "functionName": "ImageCollection.filterBounds",
-                                "arguments": {
-                                  "this": {
-                                    "functionInvocationValue": {
-                                      "functionName": "ImageCollection",
-                                      "arguments": {
-                                        "id": {
-                                          "constantValue": "COPERNICUS/S2_SR_HARMONIZED"
-                                        }
-                                      }
-                                    }
-                                  },
-                                  "geometry": {
-                                    "functionInvocationValue": {
-                                      "functionName": "Geometry.Rectangle",
-                                      "arguments": {
-                                        "coords": {
-                                          "arrayValue": {
-                                            "values": [
-                                              { "constantValue": bbox[0] },
-                                              { "constantValue": bbox[1] },
-                                              { "constantValue": bbox[2] },
-                                              { "constantValue": bbox[3] }
-                                            ]
-                                          }
-                                        }
-                                      }
-                                    }
-                                  }
-                                }
-                              }
-                            },
-                            "start": {
-                              "constantValue": "2024-01-01"
-                            },
-                            "end": {
-                              "constantValue": "2025-01-01"
-                            }
-                          }
-                        }
-                      },
-                      "condition": {
-                        "functionInvocationValue": {
-                          "functionName": "Filter.lt",
-                          "arguments": {
-                            "name": {
-                              "constantValue": "CLOUDY_PIXEL_PERCENTAGE"
-                            },
-                            "value": {
-                              "constantValue": 20
-                            }
-                          }
-                        }
-                      }
-                    }
+      "result": "0",
+      "values": {
+        "0": {
+          "functionInvocation": {
+            "functionName": "Image.normalizedDifference", 
+            "arguments": {
+              "this": {
+                "result": "1"
+              },
+              "bandNames": ["B8", "B4"]
+            }
+          }
+        },
+        "1": {
+          "functionInvocation": {
+            "functionName": "ImageCollection.median",
+            "arguments": {
+              "this": {
+                "result": "2"
+              }
+            }
+          }
+        },
+        "2": {
+          "functionInvocation": {
+            "functionName": "ImageCollection.filterBounds",
+            "arguments": {
+              "this": {
+                "result": "3"
+              },
+              "geometry": {
+                "functionInvocation": {
+                  "functionName": "Geometry.Rectangle",
+                  "arguments": {
+                    "coords": bbox
                   }
                 }
               }
             }
-          },
-          "bandNames": {
-            "arrayValue": {
-              "values": [
-                { "constantValue": "B8" },
-                { "constantValue": "B4" }
-              ]
+          }
+        },
+        "3": {
+          "functionInvocation": {
+            "functionName": "ImageCollection",
+            "arguments": {
+              "id": "COPERNICUS/S2_SR_HARMONIZED"
             }
           }
         }
@@ -589,59 +552,218 @@ async function createNDVIImage(authToken: string, bbox: number[]): Promise<strin
 }
 
 async function createLandCoverImage(authToken: string, bbox: number[]): Promise<string> {
-  const geeCode = `
-    var geometry = ee.Geometry.Rectangle([${bbox.join(', ')}]);
-    var landcover = ee.Image('ESA/WorldCover/v200/2021').clip(geometry);
-    Map.addLayer(landcover, {min: 10, max: 100}, 'Land Cover');
-  `;
+  console.log('🏞️ Creating Land Cover from ESA WorldCover...');
   
-  return await executeGEECode(authToken, geeCode);
+  const mapRequest = {
+    "expression": {
+      "result": "0",
+      "values": {
+        "0": {
+          "functionInvocation": {
+            "functionName": "Image.clip",
+            "arguments": {
+              "this": {
+                "result": "1"
+              },
+              "geometry": {
+                "functionInvocation": {
+                  "functionName": "Geometry.Rectangle",
+                  "arguments": {
+                    "coords": bbox
+                  }
+                }
+              }
+            }
+          }
+        },
+        "1": {
+          "functionInvocation": {
+            "functionName": "Image",
+            "arguments": {
+              "id": "ESA/WorldCover/v200/2021"
+            }
+          }
+        }
+      }
+    }
+  };
+  
+  return await executeGEECode(authToken, mapRequest);
 }
 
 async function createBiomassImage(authToken: string, bbox: number[]): Promise<string> {
-  const geeCode = `
-    var geometry = ee.Geometry.Rectangle([${bbox.join(', ')}]);
-    var biomass = ee.Image('ESA/CCI/BIOMASS/v1/AGB/2020').clip(geometry);
-    Map.addLayer(biomass, {min: 0, max: 300}, 'Above Ground Biomass');
-  `;
+  console.log('🌳 Creating Biomass from ESA data...');
   
-  return await executeGEECode(authToken, geeCode);
+  const mapRequest = {
+    "expression": {
+      "result": "0",
+      "values": {
+        "0": {
+          "functionInvocation": {
+            "functionName": "Image.clip",
+            "arguments": {
+              "this": {
+                "result": "1"
+              },
+              "geometry": {
+                "functionInvocation": {
+                  "functionName": "Geometry.Rectangle",
+                  "arguments": {
+                    "coords": bbox
+                  }
+                }
+              }
+            }
+          }
+        },
+        "1": {
+          "functionInvocation": {
+            "functionName": "Image",
+            "arguments": {
+              "id": "ESA/CCI/BIOMASS/v1/AGB/2020"
+            }
+          }
+        }
+      }
+    }
+  };
+  
+  return await executeGEECode(authToken, mapRequest);
 }
 
 async function createChangeImage(authToken: string, bbox: number[]): Promise<string> {
-  const geeCode = `
-    var geometry = ee.Geometry.Rectangle([${bbox.join(', ')}]);
-    var before = ee.ImageCollection('LANDSAT/LC08/C02/T1_L2')
-      .filterBounds(geometry)
-      .filterDate('2020-01-01', '2021-01-01')
-      .median();
-    var after = ee.ImageCollection('LANDSAT/LC08/C02/T1_L2')
-      .filterBounds(geometry)
-      .filterDate('2023-01-01', '2024-01-01')
-      .median();
-    
-    var ndviBefore = before.normalizedDifference(['SR_B5', 'SR_B4']);
-    var ndviAfter = after.normalizedDifference(['SR_B5', 'SR_B4']);
-    var change = ndviAfter.subtract(ndviBefore);
-    
-    Map.addLayer(change, {min: -0.5, max: 0.5}, 'NDVI Change');
-  `;
+  console.log('📈 Creating Change Detection from Landsat...');
   
-  return await executeGEECode(authToken, geeCode);
+  const mapRequest = {
+    "expression": {
+      "result": "0",
+      "values": {
+        "0": {
+          "functionInvocation": {
+            "functionName": "Image.subtract",
+            "arguments": {
+              "this": {
+                "result": "1"
+              },
+              "image2": {
+                "result": "2"
+              }
+            }
+          }
+        },
+        "1": {
+          "functionInvocation": {
+            "functionName": "Image.normalizedDifference",
+            "arguments": {
+              "this": {
+                "result": "3"
+              },
+              "bandNames": ["SR_B5", "SR_B4"]
+            }
+          }
+        },
+        "2": {
+          "functionInvocation": {
+            "functionName": "Image.normalizedDifference",
+            "arguments": {
+              "this": {
+                "result": "4"
+              },
+              "bandNames": ["SR_B5", "SR_B4"]
+            }
+          }
+        },
+        "3": {
+          "functionInvocation": {
+            "functionName": "ImageCollection.median",
+            "arguments": {
+              "this": {
+                "result": "5"
+              }
+            }
+          }
+        },
+        "4": {
+          "functionInvocation": {
+            "functionName": "ImageCollection.median",
+            "arguments": {
+              "this": {
+                "result": "6"
+              }
+            }
+          }
+        },
+        "5": {
+          "functionInvocation": {
+            "functionName": "ImageCollection",
+            "arguments": {
+              "id": "LANDSAT/LC08/C02/T1_L2"
+            }
+          }
+        },
+        "6": {
+          "functionInvocation": {
+            "functionName": "ImageCollection",
+            "arguments": {
+              "id": "LANDSAT/LC08/C02/T1_L2"
+            }
+          }
+        }
+      }
+    }
+  };
+  
+  return await executeGEECode(authToken, mapRequest);
 }
 
 async function createCloudImage(authToken: string, bbox: number[]): Promise<string> {
-  const geeCode = `
-    var geometry = ee.Geometry.Rectangle([${bbox.join(', ')}]);
-    var collection = ee.ImageCollection('COPERNICUS/S2_CLOUD_PROBABILITY')
-      .filterBounds(geometry)
-      .filterDate('2024-01-01', '2025-01-01')
-      .mean();
-    
-    Map.addLayer(collection, {min: 0, max: 100}, 'Cloud Probability');
-  `;
+  console.log('☁️ Creating Cloud Cover from Sentinel-2...');
   
-  return await executeGEECode(authToken, geeCode);
+  const mapRequest = {
+    "expression": {
+      "result": "0", 
+      "values": {
+        "0": {
+          "functionInvocation": {
+            "functionName": "ImageCollection.mean",
+            "arguments": {
+              "this": {
+                "result": "1"
+              }
+            }
+          }
+        },
+        "1": {
+          "functionInvocation": {
+            "functionName": "ImageCollection.filterBounds",
+            "arguments": {
+              "this": {
+                "result": "2"
+              },
+              "geometry": {
+                "functionInvocation": {
+                  "functionName": "Geometry.Rectangle",
+                  "arguments": {
+                    "coords": bbox
+                  }
+                }
+              }
+            }
+          }
+        },
+        "2": {
+          "functionInvocation": {
+            "functionName": "ImageCollection",
+            "arguments": {
+              "id": "COPERNICUS/S2_CLOUD_PROBABILITY"
+            }
+          }
+        }
+      }
+    }
+  };
+  
+  return await executeGEECode(authToken, mapRequest);
 }
 
 async function executeGEECode(authToken: string, imageExpression: any): Promise<string> {
