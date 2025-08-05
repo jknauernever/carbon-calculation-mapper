@@ -1,1 +1,10 @@
 project_id = "sereallctpcqrdjmvwrs"
+
+[functions.get-mapbox-token]
+verify_jwt = false
+
+[functions.calculate-carbon]
+verify_jwt = false
+
+[functions.calculate-carbon-gee]
+verify_jwt = false
