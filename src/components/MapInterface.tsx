@@ -311,7 +311,7 @@ export const MapInterface = () => {
     if (!map.current || !isMapLoaded) return;
 
     try {
-      console.log(`Adding GEE layer: ${layerId}`);
+      console.log(`🧪 TESTING: Adding layer: ${layerId}`);
       
       // Generate live GEE tile URL
       const { data, error } = await supabase.functions.invoke('calculate-carbon-gee', {
@@ -323,32 +323,59 @@ export const MapInterface = () => {
       });
 
       if (error) {
-        console.error(`Error getting tile URL for ${layerId}:`, error);
+        console.error(`❌ Error getting tile URL for ${layerId}:`, error);
         throw error;
       }
 
       const tileUrl = data.tileUrl;
-      console.log(`Got tile URL for ${layerId}:`, tileUrl);
+      console.log(`🔗 Generated URL for ${layerId}:`, tileUrl);
+
+      // Test the tile URL by trying to fetch a specific tile
+      const testTileUrl = tileUrl
+        .replace('{z}', '5')
+        .replace('{x}', '10') 
+        .replace('{y}', '12')
+        .replace('{bbox-epsg-3857}', '-20037508.34,-20037508.34,20037508.34,20037508.34');
+      
+      console.log(`🧪 Testing specific tile URL: ${testTileUrl}`);
+      
+      try {
+        const testResponse = await fetch(testTileUrl, { method: 'HEAD' });
+        console.log(`📊 Tile test result for ${layerId}:`, {
+          status: testResponse.status,
+          statusText: testResponse.statusText,
+          contentType: testResponse.headers.get('content-type'),
+          url: testTileUrl
+        });
+        
+        if (testResponse.status !== 200) {
+          console.warn(`⚠️ Tile test failed for ${layerId}: ${testResponse.status}`);
+        } else {
+          console.log(`✅ Tile test SUCCESS for ${layerId}`);
+        }
+      } catch (testError) {
+        console.error(`❌ Tile test error for ${layerId}:`, testError);
+      }
 
       // Remove existing layer if it exists
       if (map.current.getLayer(layerId)) {
-        console.log(`Removing existing layer: ${layerId}`);
+        console.log(`🗑️ Removing existing layer: ${layerId}`);
         map.current.removeLayer(layerId);
       }
       if (map.current.getSource(layerId)) {
-        console.log(`Removing existing source: ${layerId}`);
+        console.log(`🗑️ Removing existing source: ${layerId}`);
         map.current.removeSource(layerId);
       }
 
       // Add new GEE tile layer
-      console.log(`Adding source for ${layerId}:`, tileUrl);
+      console.log(`📍 Adding source for ${layerId}:`, tileUrl);
       map.current.addSource(layerId, {
         type: 'raster',
         tiles: [tileUrl],
         tileSize: 256
       });
 
-      console.log(`Adding layer for ${layerId}`);
+      console.log(`🎨 Adding layer for ${layerId}`);
       map.current.addLayer({
         id: layerId,
         type: 'raster',
@@ -358,27 +385,30 @@ export const MapInterface = () => {
         }
       });
 
-      // Add event listeners for debugging tile loading
+      // Add comprehensive event listeners for debugging
       map.current.on('sourcedataloading', (e) => {
         if (e.sourceId === layerId) {
-          console.log(`Loading tiles for ${layerId}:`, e);
+          console.log(`⏳ Loading tiles for ${layerId}`);
         }
       });
 
       map.current.on('sourcedata', (e) => {
-        if (e.sourceId === layerId) {
-          console.log(`Tiles loaded for ${layerId}:`, e.isSourceLoaded);
+        if (e.sourceId === layerId && e.isSourceLoaded) {
+          console.log(`✅ Tiles loaded successfully for ${layerId}`);
         }
       });
 
-      map.current.on('error', (e) => {
-        console.error(`Map error for ${layerId}:`, e);
+      map.current.on('error', (e: any) => {
+        console.error(`❌ Map error for ${layerId}:`, e);
+        if (e.error && typeof e.error === 'object') {
+          console.error(`Failed URL: ${(e.error as any).url || 'Unknown URL'}`);
+        }
       });
 
-      toast.success(`${layerId} layer added to map`);
+      toast.success(`${layerId} layer added - check console for verification`);
     } catch (error) {
-      console.error(`Error adding ${layerId} layer:`, error);
-      toast.error(`Failed to load ${layerId} layer`);
+      console.error(`❌ Error adding ${layerId} layer:`, error);
+      toast.error(`Failed to load ${layerId} layer - check console for details`);
     }
   };
 
