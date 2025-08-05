@@ -88,7 +88,7 @@ serve(async (req) => {
     console.log('🌍 Step 3: Sending POST to GEE v1beta endpoint...');
 
     const geeRequestBody = {
-      "expression": "var geometry = ee.Geometry.Point([-120.0, 37.0]);\\nvar ndvi = ee.ImageCollection('MODIS/006/MOD13Q1')\\n  .select('NDVI')\\n  .filterDate('2020-01-01', '2020-12-31')\\n  .filterBounds(geometry);\\nvar ndviSeries = ndvi.map(function(img) {\\n  var value = img.reduceRegion({\\n    reducer: ee.Reducer.mean(),\\n    geometry: geometry,\\n    scale: 250\\n  });\\n  return ee.Feature(null, value).set('system:time_start', img.get('system:time_start'));\\n});\\nndviSeries;",
+      "expression": "ImageCollection('MODIS/006/MOD13Q1').select('NDVI').filterDate('2020-01-01', '2020-12-31').mean().reduceRegion({reducer: Reducer.mean(), geometry: Geometry.Point([-120.0, 37.0]), scale: 250})",
       "project": "earthengine-public"
     };
 
