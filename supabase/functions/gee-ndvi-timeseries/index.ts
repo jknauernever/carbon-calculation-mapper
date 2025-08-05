@@ -23,7 +23,7 @@ serve(async (req) => {
 
     // Generate JWT for authentication
     const header = {
-      alg: "RS256",
+      alg: "RS256", 
       typ: "JWT"
     };
 
@@ -36,45 +36,70 @@ serve(async (req) => {
       iat: now
     };
 
-    // Create JWT manually (simplified approach)
-    const headerB64 = btoa(JSON.stringify(header)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-    const payloadB64 = btoa(JSON.stringify(payload)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-    
-    // For this simplified version, we'll use the private key from the service account
-    // Note: In production, you'd want proper RSA signing
-    const privateKeyPem = serviceAccount.private_key
-      .replace(/\\n/g, '\n')
-      .replace('-----BEGIN PRIVATE KEY-----', '')
-      .replace('-----END PRIVATE KEY-----', '')
-      .replace(/\s/g, '');
+    console.log('Creating JWT payload:', payload);
 
-    // Import the private key
-    const privateKeyBuffer = Uint8Array.from(atob(privateKeyPem), c => c.charCodeAt(0));
-    const privateKey = await crypto.subtle.importKey(
-      'pkcs8',
-      privateKeyBuffer,
+    // Simple approach: use the existing working JWT creation from calculate-carbon-gee
+    // Convert private key to proper format
+    const privateKeyPem = serviceAccount.private_key;
+    console.log('Private key length:', privateKeyPem.length);
+
+    // Create the JWT parts
+    const encodedHeader = btoa(JSON.stringify(header))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')  
+      .replace(/=/g, '');
+    
+    const encodedPayload = btoa(JSON.stringify(payload))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
+
+    const signingInput = `${encodedHeader}.${encodedPayload}`;
+    console.log('Signing input created, length:', signingInput.length);
+
+    // Import the private key for RSA signing
+    const pemHeader = "-----BEGIN PRIVATE KEY-----";
+    const pemFooter = "-----END PRIVATE KEY-----";
+    const pemContents = privateKeyPem
+      .replace(pemHeader, "")
+      .replace(pemFooter, "")
+      .replace(/\\n/g, "")
+      .replace(/\s/g, "");
+
+    console.log('Cleaned PEM contents length:', pemContents.length);
+
+    const binaryDer = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0));
+    console.log('Binary DER length:', binaryDer.length);
+
+    const cryptoKey = await crypto.subtle.importKey(
+      "pkcs8",
+      binaryDer,
       {
-        name: 'RSASSA-PKCS1-v1_5',
-        hash: 'SHA-256',
+        name: "RSASSA-PKCS1-v1_5",
+        hash: "SHA-256",
       },
       false,
-      ['sign']
+      ["sign"]
     );
+    console.log('Crypto key imported successfully');
 
-    // Sign the JWT
-    const signData = new TextEncoder().encode(`${headerB64}.${payloadB64}`);
     const signature = await crypto.subtle.sign(
-      'RSASSA-PKCS1-v1_5',
-      privateKey,
-      signData
+      "RSASSA-PKCS1-v1_5", 
+      cryptoKey,
+      new TextEncoder().encode(signingInput)
     );
+    console.log('Signature created, length:', signature.byteLength);
 
-    const signatureB64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
-      .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-    
-    const jwt = `${headerB64}.${payloadB64}.${signatureB64}`;
+    const encodedSignature = btoa(String.fromCharCode(...new Uint8Array(signature)))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
+
+    const jwt = `${encodedHeader}.${encodedPayload}.${encodedSignature}`;
+    console.log('JWT created, length:', jwt.length);
 
     // Exchange JWT for access token
+    console.log('Exchanging JWT for access token...');
     const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: {
@@ -84,11 +109,14 @@ serve(async (req) => {
     });
 
     const tokenData = await tokenResponse.json();
-    console.log('Token response:', tokenData);
+    console.log('Token response status:', tokenResponse.status);
+    console.log('Token data:', tokenData);
 
     if (!tokenData.access_token) {
       throw new Error(`Failed to get access token: ${JSON.stringify(tokenData)}`);
     }
+
+    console.log('Access token obtained successfully');
 
     // Create GEE expression for NDVI time series
     const geeExpression = `
