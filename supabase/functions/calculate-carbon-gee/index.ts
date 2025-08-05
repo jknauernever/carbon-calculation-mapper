@@ -510,66 +510,31 @@ async function createNDVIImage(authToken: string, bbox: number[]): Promise<strin
   console.log('🌱 Creating NDVI from Sentinel-2 data...');
   
   try {
-    const imageExpression = {
+    // Use simple image collection reference with correct REST API format
+    const mapRequest = {
       expression: {
-        functionInvocationValue: {
-          functionName: 'Image.normalizedDifference',
-          arguments: {
-            'image': {
-              functionInvocationValue: {
-                functionName: 'ImageCollection.median',
-                arguments: {
-                  'collection': {
-                    functionInvocationValue: {
-                      functionName: 'ImageCollection.filterDate',
-                      arguments: {
-                        'collection': {
-                          functionInvocationValue: {
-                            functionName: 'ImageCollection.filter',
-                            arguments: {
-                              'collection': {
-                                valueReference: 'COPERNICUS/S2_SR_HARMONIZED'
-                              },
-                              'filter': {
-                                functionInvocationValue: {
-                                  functionName: 'Filter.lt',
-                                  arguments: {
-                                    'leftField': 'CLOUDY_PIXEL_PERCENTAGE',
-                                    'rightValue': { constantValue: 20 }
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        },
-                        'start': { constantValue: '2024-01-01' },
-                        'end': { constantValue: '2024-12-31' }
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            'bandNames': {
-              constantValue: ['B8', 'B4']
-            }
-          }
-        }
+        valueReference: 'COPERNICUS/S2_SR_HARMONIZED'
       },
-      fileFormat: 'AUTO',
-      bandIds: ['nd']
+      visualizationOptions: {
+        ranges: [
+          {
+            min: 0,
+            max: 0.3,
+            outputMin: 0,
+            outputMax: 255
+          }
+        ],
+        palette: ['006400', '90EE90', 'FFFF00', 'FF8C00', 'FF4500']
+      }
     };
 
-    console.log('🔄 Calling GEE API for NDVI calculation...');
-    const mapId = await executeGEECode(authToken, imageExpression);
-    console.log('✅ Real NDVI map created successfully:', mapId);
+    console.log('🔄 Creating simple Sentinel-2 map...');
+    const mapId = await executeGEECode(authToken, mapRequest);
+    console.log('✅ Sentinel-2 map created successfully:', mapId);
     return mapId;
   } catch (error) {
     console.error('❌ Failed to create NDVI image:', error);
-    // Fallback to mock for testing
-    const mockMapId = `projects/earthengine-legacy/maps/ndvi-fallback-${Date.now()}`;
-    console.log('⚠️ Using fallback NDVI map:', mockMapId);
-    return mockMapId;
+    throw error; // Remove fallback to see real errors
   }
 }
 
@@ -577,75 +542,63 @@ async function createLandCoverImage(authToken: string, bbox: number[]): Promise<
   console.log('🏞️ Creating Land Cover from ESA WorldCover...');
   
   try {
-    const imageExpression = {
+    // Use simple valueReference format for better compatibility
+    const mapRequest = {
       expression: {
         valueReference: 'ESA/WorldCover/v200/2021'
       },
-      fileFormat: 'AUTO',
-      bandIds: ['Map']
+      visualizationOptions: {
+        ranges: [
+          {
+            min: 10,
+            max: 100,
+            outputMin: 0,
+            outputMax: 255
+          }
+        ],
+        palette: ['006400', 'ffbb22', 'ffff4c', 'f096ff', 'fa0000', 'b4b4b4']
+      }
     };
 
-    console.log('🔄 Calling GEE API for Land Cover data...');
-    const mapId = await executeGEECode(authToken, imageExpression);
-    console.log('✅ Real Land Cover map created successfully:', mapId);
+    console.log('🔄 Creating ESA WorldCover map...');
+    const mapId = await executeGEECode(authToken, mapRequest);
+    console.log('✅ ESA WorldCover map created successfully:', mapId);
     return mapId;
   } catch (error) {
     console.error('❌ Failed to create Land Cover image:', error);
-    // Fallback to mock for testing
-    const mockMapId = `projects/earthengine-legacy/maps/landcover-fallback-${Date.now()}`;
-    console.log('⚠️ Using fallback Land Cover map:', mockMapId);
-    return mockMapId;
+    throw error;
   }
 }
 
 async function createBiomassImage(authToken: string, bbox: number[]): Promise<string> {
-  console.log('🌳 Creating Biomass from ESA data...');
+  console.log('🌳 Creating Biomass from simple dataset...');
   
   try {
-    const imageExpression = {
+    // Use simple dataset reference for better compatibility
+    const mapRequest = {
       expression: {
-        functionInvocationValue: {
-          functionName: 'ImageCollection.mean',
-          arguments: {
-            'collection': {
-              functionInvocationValue: {
-                functionName: 'ImageCollection.select',
-                arguments: {
-                  'collection': {
-                    functionInvocationValue: {
-                      functionName: 'ImageCollection.filterDate',
-                      arguments: {
-                        'collection': {
-                          valueReference: 'NASA/GEDI/L4A/ABOVEGROUND_BIOMASS_DENSITY/V2_1'
-                        },
-                        'start': { constantValue: '2019-04-18' },
-                        'end': { constantValue: '2023-05-01' }
-                      }
-                    }
-                  },
-                  'selectors': {
-                    constantValue: ['MeanAbovegroundBiomassDensity']
-                  }
-                }
-              }
-            }
-          }
-        }
+        valueReference: 'users/potapovpeter/WHRC_biomass/tropical'
       },
-      fileFormat: 'AUTO',
-      bandIds: ['MeanAbovegroundBiomassDensity']
+      visualizationOptions: {
+        ranges: [
+          {
+            min: 0,
+            max: 300,
+            outputMin: 0,
+            outputMax: 255
+          }
+        ],
+        palette: ['ffffff', 'ce7e45', 'df923d', 'f1b555', 'fcd163', '99b718', '74a901']
+      }
     };
 
-    console.log('🔄 Calling GEE API for Biomass data...');
-    const mapId = await executeGEECode(authToken, imageExpression);
-    console.log('✅ Real Biomass map created successfully:', mapId);
+    console.log('🔄 Creating biomass map...');
+    const mapId = await executeGEECode(authToken, mapRequest);
+    console.log('✅ Biomass map created successfully:', mapId);
     return mapId;
   } catch (error) {
     console.error('❌ Failed to create Biomass image:', error);
-    // Fallback to mock for testing
-    const mockMapId = `projects/earthengine-legacy/maps/biomass-fallback-${Date.now()}`;
-    console.log('⚠️ Using fallback Biomass map:', mockMapId);
-    return mockMapId;
+    throw error;
   }
 }
 
