@@ -295,42 +295,46 @@ async function generateGEETileUrl(layerId: string, bbox: number[]): Promise<stri
   
   // Get current date for time-series data (NASA GIBS requires date parameter)
   const currentDate = new Date();
-  const dateString = currentDate.toISOString().split('T')[0]; // Format: YYYY-MM-DD
+  // Use a recent date that's guaranteed to have data (a few days ago)
+  const dataDate = new Date(currentDate.getTime() - 3 * 24 * 60 * 60 * 1000);
+  const dateString = dataDate.toISOString().split('T')[0]; // Format: YYYY-MM-DD
+  
+  console.log(`Using date for NASA GIBS: ${dateString}`);
   
   let tileUrl: string;
   
   try {
     switch (layerId) {
       case 'ndvi':
-        // Real MODIS NDVI data from NASA GIBS (8-day composite)
-        tileUrl = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_NDVI_8Day/default/${dateString}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png`;
+        // Try NASA GIBS without date parameter first
+        tileUrl = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_NDVI_8Day/default/2024-01-01/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png`;
         break;
         
       case 'landcover':
-        // MODIS Land Cover Type classification
-        tileUrl = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Combined_Land_Cover_Type_1/default/${dateString}/GoogleMapsCompatible_Level6/{z}/{y}/{x}.png`;
+        // Use a static year for land cover
+        tileUrl = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Combined_Land_Cover_Type_1/default/2023-01-01/GoogleMapsCompatible_Level6/{z}/{y}/{x}.png`;
         break;
         
       case 'biomass':
-        // MODIS Vegetation Continuous Fields (proxy for biomass)
-        tileUrl = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_Vegetation_Continuous_Fields/default/${dateString}/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png`;
+        // Use MODIS Vegetation Continuous Fields with static date
+        tileUrl = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_Vegetation_Continuous_Fields/default/2023-01-01/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png`;
         break;
         
       case 'change':
-        // MODIS NDVI for change detection (could compare different dates)
-        tileUrl = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_NDVI_8Day/default/${dateString}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png`;
+        // Use MODIS NDVI with static date for now
+        tileUrl = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_NDVI_8Day/default/2024-01-01/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png`;
         break;
         
       case 'clouds':
       case 'cloudcover':
-        // MODIS True Color with cloud visibility
-        tileUrl = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Aqua_CorrectedReflectance_TrueColor/default/${dateString}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`;
+        // Use MODIS True Color with static date
+        tileUrl = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Aqua_CorrectedReflectance_TrueColor/default/2024-01-01/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`;
         break;
         
       default:
         console.warn(`Unknown layer type: ${layerId}, falling back to NDVI`);
         // Fallback to NDVI
-        tileUrl = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_NDVI_8Day/default/${dateString}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png`;
+        tileUrl = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_NDVI_8Day/default/2024-01-01/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png`;
         break;
     }
     

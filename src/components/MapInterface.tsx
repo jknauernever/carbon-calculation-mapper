@@ -311,6 +311,8 @@ export const MapInterface = () => {
     if (!map.current || !isMapLoaded) return;
 
     try {
+      console.log(`Adding GEE layer: ${layerId}`);
+      
       // Generate live GEE tile URL
       const { data, error } = await supabase.functions.invoke('calculate-carbon-gee', {
         body: {
@@ -320,25 +322,33 @@ export const MapInterface = () => {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error(`Error getting tile URL for ${layerId}:`, error);
+        throw error;
+      }
 
       const tileUrl = data.tileUrl;
+      console.log(`Got tile URL for ${layerId}:`, tileUrl);
 
       // Remove existing layer if it exists
       if (map.current.getLayer(layerId)) {
+        console.log(`Removing existing layer: ${layerId}`);
         map.current.removeLayer(layerId);
       }
       if (map.current.getSource(layerId)) {
+        console.log(`Removing existing source: ${layerId}`);
         map.current.removeSource(layerId);
       }
 
       // Add new GEE tile layer
+      console.log(`Adding source for ${layerId}:`, tileUrl);
       map.current.addSource(layerId, {
         type: 'raster',
         tiles: [tileUrl],
         tileSize: 256
       });
 
+      console.log(`Adding layer for ${layerId}`);
       map.current.addLayer({
         id: layerId,
         type: 'raster',
@@ -346,6 +356,23 @@ export const MapInterface = () => {
         paint: {
           'raster-opacity': (activeLayers[layerId]?.opacity || 80) / 100
         }
+      });
+
+      // Add event listeners for debugging tile loading
+      map.current.on('sourcedataloading', (e) => {
+        if (e.sourceId === layerId) {
+          console.log(`Loading tiles for ${layerId}:`, e);
+        }
+      });
+
+      map.current.on('sourcedata', (e) => {
+        if (e.sourceId === layerId) {
+          console.log(`Tiles loaded for ${layerId}:`, e.isSourceLoaded);
+        }
+      });
+
+      map.current.on('error', (e) => {
+        console.error(`Map error for ${layerId}:`, e);
       });
 
       toast.success(`${layerId} layer added to map`);
