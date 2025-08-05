@@ -95,7 +95,7 @@ serve(async (req) => {
     console.log('Request body:', JSON.stringify(geeRequestBody, null, 2));
 
     const geeResponse = await fetch(
-      "https://earthengine.googleapis.com/v1beta/projects/earthengine:run",  // v1beta as specified
+      "https://earthengine.googleapis.com/v1/projects/earthengine-public/value:compute",
       {
         method: "POST",
         headers: {
