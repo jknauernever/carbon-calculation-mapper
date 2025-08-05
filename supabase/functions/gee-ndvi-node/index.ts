@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import ee from "npm:@google/earthengine@0.1.398";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,6 +14,9 @@ serve(async (req) => {
   try {
     console.log('🌱 Starting GEE NDVI with JavaScript client library...');
 
+    // Import Earth Engine using require (for Node.js compatibility)
+    const ee = require('@google/earthengine');
+
     // Get service account from environment
     const serviceAccountJson = Deno.env.get('GEE_SERVICE_ACCOUNT');
     if (!serviceAccountJson) {
@@ -22,16 +24,14 @@ serve(async (req) => {
     }
 
     console.log('🔑 Service account found, parsing...');
-    const serviceAccount = JSON.parse(serviceAccountJson);
+    const serviceAccountObject = JSON.parse(serviceAccountJson);
 
-    // Initialize Earth Engine with service account authentication
+    // Authenticate with Earth Engine using the correct method
     console.log('🔐 Authenticating with Earth Engine...');
-    await new Promise((resolve, reject) => {
-      ee.data.authenticateViaServiceAccount(serviceAccount, () => {
-        console.log('✅ Authentication successful');
-        ee.initialize(null, null, resolve, reject);
-      }, reject);
-    });
+    await ee.data.authenticateViaPrivateKey(serviceAccountObject);
+    
+    console.log('✅ Authentication successful, initializing Earth Engine...');
+    await ee.initialize();
 
     console.log('🌍 Earth Engine initialized, fetching NDVI data...');
 
