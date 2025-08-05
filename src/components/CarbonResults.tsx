@@ -17,6 +17,11 @@ export const CarbonResults = () => {
           <p className="text-muted-foreground max-w-2xl mx-auto">
             Select a property and calculate its carbon storage to see detailed results here.
           </p>
+          {/* Debug info */}
+          <div className="mt-4 text-xs text-muted-foreground">
+            Selected Property: {selectedProperty ? 'Yes' : 'No'} | 
+            Carbon Calculation: {carbonCalculation ? 'Yes' : 'No'}
+          </div>
         </div>
       </div>
     );
@@ -69,10 +74,10 @@ export const CarbonResults = () => {
         {/* Total Carbon Summary */}
         <Card className="lg:col-span-1 border-primary/20 bg-gradient-earth">
           <CardHeader className="text-center pb-4">
-            <CardTitle className="flex items-center justify-center gap-2 text-2xl text-primary">
-              Total Carbon Storage
+            <div className="flex items-center justify-center gap-2">
+              <CardTitle className="text-2xl text-primary">Total Carbon Storage</CardTitle>
               <CarbonMethodologyInfo />
-            </CardTitle>
+            </div>
           </CardHeader>
           <CardContent className="text-center space-y-4">
             <div>
