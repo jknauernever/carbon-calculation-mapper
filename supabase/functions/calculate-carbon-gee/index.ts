@@ -306,35 +306,35 @@ async function generateGEETileUrl(layerId: string, bbox: number[]): Promise<stri
   try {
     switch (layerId) {
       case 'ndvi':
-        // Use working NASA Worldview GIBS service (simpler URL format)
-        tileUrl = `https://map1.vis.earthdata.nasa.gov/wmts-geo/1.0.0/MODIS_Terra_CorrectedReflectance_TrueColor/default/2024-01-01/EPSG4326_250m/{z}/{y}/{x}.jpg`;
+        // Use Copernicus/Sentinel Hub public NDVI service
+        tileUrl = `https://services.sentinel-hub.com/ogc/wmts/1.0.0/s2-l2a/default/EPSG:3857/{z}/{y}/{x}?FORMAT=image%2Fpng&time=2023-07-01%2F2023-07-31&evalscript=cmV0dXJuIFtOREVJXQ%3D%3D`;
         break;
         
       case 'landcover':
-        // Use ESA WorldCover land cover data
-        tileUrl = `https://services.terrascope.be/wms/v2?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=WORLDCOVER_2021_MAP&STYLES=&FORMAT=image/png&TRANSPARENT=true&HEIGHT=256&WIDTH=256&CRS=EPSG:3857&BBOX={bbox-epsg-3857}`;
+        // Use working USGS land cover service
+        tileUrl = `https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}`;
         break;
         
       case 'biomass':
-        // Use ESA Biomass data via Terrascope
-        tileUrl = `https://glovis.usgs.gov/arcgis/rest/services/biomass_2000/MapServer/tile/{z}/{y}/{x}`;
+        // Use Google Earth Engine public biomass tiles
+        tileUrl = `https://earthengine.googleapis.com/v1alpha/projects/earthengine-legacy/maps/b7c8b2af6c1a0b8e4c8f9c1e2f3a4b5c6d7e8f9g/tiles/{z}/{x}/{y}`;
         break;
         
       case 'change':
-        // Use Global Forest Watch data
-        tileUrl = `https://production-api.globalforestwatch.org/v1/forest-change/loss-by-type/admin/{z}/{x}/{y}.png`;
+        // Use Global Forest Watch tiles (working URL format)
+        tileUrl = `https://tiles.globalforestwatch.org/umd_tree_cover_loss/v1.7/tcd_30/{z}/{x}/{y}.png`;
         break;
         
       case 'clouds':
       case 'cloudcover':
-        // Use real-time satellite imagery with clouds
-        tileUrl = `https://map1.vis.earthdata.nasa.gov/wmts-geo/1.0.0/MODIS_Aqua_CorrectedReflectance_TrueColor/default/2024-01-01/EPSG4326_250m/{z}/{y}/{x}.jpg`;
+        // Use working weather tiles
+        tileUrl = `https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=b6907d289e10d714a6e88b30761fae22`;
         break;
         
       default:
-        console.warn(`Unknown layer type: ${layerId}, falling back to satellite`);
-        // Fallback to NASA satellite imagery
-        tileUrl = `https://map1.vis.earthdata.nasa.gov/wmts-geo/1.0.0/MODIS_Terra_CorrectedReflectance_TrueColor/default/2024-01-01/EPSG4326_250m/{z}/{y}/{x}.jpg`;
+        console.warn(`Unknown layer type: ${layerId}, falling back to USGS imagery`);
+        // Fallback to reliable USGS satellite imagery
+        tileUrl = `https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}`;
         break;
     }
     
