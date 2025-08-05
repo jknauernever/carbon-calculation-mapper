@@ -10,9 +10,10 @@ serve(async (req) => {
   }
 
   try {
+    console.log('🌱 NDVI Time Series function called');
+    
     const { latitude, longitude, startDate, endDate } = await req.json();
-
-    console.log('NDVI request:', { latitude, longitude, startDate, endDate });
+    console.log('📍 Request params:', { latitude, longitude, startDate, endDate });
 
     if (!SERVICE_ACCOUNT_KEY) {
       throw new Error('GEE_SERVICE_ACCOUNT not configured');
@@ -20,132 +21,93 @@ serve(async (req) => {
 
     // Parse service account key
     const serviceAccount = JSON.parse(SERVICE_ACCOUNT_KEY);
+    console.log('🔑 Service account loaded:', serviceAccount.client_email);
 
-    // Generate JWT for authentication
-    const header = {
-      alg: "RS256", 
-      typ: "JWT"
-    };
-
+    // Create JWT for GEE authentication (copied from working function)
+    const header = { alg: "RS256", typ: "JWT" };
     const now = Math.floor(Date.now() / 1000);
     const payload = {
       iss: serviceAccount.client_email,
-      scope: "https://www.googleapis.com/auth/earthengine.readonly",
+      scope: "https://www.googleapis.com/auth/earthengine",
       aud: "https://oauth2.googleapis.com/token",
       exp: now + 3600,
       iat: now
     };
 
-    console.log('Creating JWT payload:', payload);
-
-    // Simple approach: use the existing working JWT creation from calculate-carbon-gee
-    // Convert private key to proper format
-    const privateKeyPem = serviceAccount.private_key;
-    console.log('Private key length:', privateKeyPem.length);
-
-    // Create the JWT parts
-    const encodedHeader = btoa(JSON.stringify(header))
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')  
-      .replace(/=/g, '');
+    const headerB64 = btoa(JSON.stringify(header)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+    const payloadB64 = btoa(JSON.stringify(payload)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
     
-    const encodedPayload = btoa(JSON.stringify(payload))
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=/g, '');
-
-    const signingInput = `${encodedHeader}.${encodedPayload}`;
-    console.log('Signing input created, length:', signingInput.length);
-
-    // Import the private key for RSA signing
+    // Process private key exactly like the working function
+    const privateKeyPem = serviceAccount.private_key;
     const pemHeader = "-----BEGIN PRIVATE KEY-----";
     const pemFooter = "-----END PRIVATE KEY-----";
-    const pemContents = privateKeyPem
-      .replace(pemHeader, "")
-      .replace(pemFooter, "")
-      .replace(/\\n/g, "")
-      .replace(/\s/g, "");
-
-    console.log('Cleaned PEM contents length:', pemContents.length);
-
+    const pemContents = privateKeyPem.replace(pemHeader, "").replace(pemFooter, "").replace(/\\n/g, "").replace(/\s/g, "");
     const binaryDer = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0));
-    console.log('Binary DER length:', binaryDer.length);
 
     const cryptoKey = await crypto.subtle.importKey(
       "pkcs8",
       binaryDer,
-      {
-        name: "RSASSA-PKCS1-v1_5",
-        hash: "SHA-256",
-      },
+      { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
       false,
       ["sign"]
     );
-    console.log('Crypto key imported successfully');
 
     const signature = await crypto.subtle.sign(
       "RSASSA-PKCS1-v1_5", 
       cryptoKey,
-      new TextEncoder().encode(signingInput)
+      new TextEncoder().encode(`${headerB64}.${payloadB64}`)
     );
-    console.log('Signature created, length:', signature.byteLength);
 
-    const encodedSignature = btoa(String.fromCharCode(...new Uint8Array(signature)))
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=/g, '');
-
-    const jwt = `${encodedHeader}.${encodedPayload}.${encodedSignature}`;
-    console.log('JWT created, length:', jwt.length);
+    const signatureB64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
+      .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+    
+    const jwt = `${headerB64}.${payloadB64}.${signatureB64}`;
+    console.log('✅ JWT created successfully');
 
     // Exchange JWT for access token
-    console.log('Exchanging JWT for access token...');
     const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`
     });
 
     const tokenData = await tokenResponse.json();
-    console.log('Token response status:', tokenResponse.status);
-    console.log('Token data:', tokenData);
-
     if (!tokenData.access_token) {
       throw new Error(`Failed to get access token: ${JSON.stringify(tokenData)}`);
     }
+    console.log('✅ Access token obtained');
 
-    console.log('Access token obtained successfully');
-
-    // Create GEE expression for NDVI time series
+    // Create NDVI time series expression for GEE
     const geeExpression = `
 var geometry = ee.Geometry.Point([${longitude}, ${latitude}]);
-var ndvi = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')
+var collection = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')
   .filterDate('${startDate}', '${endDate}')
   .filterBounds(geometry)
-  .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 20))
-  .map(function(img) {
-    var ndviValue = img.normalizedDifference(['B8', 'B4']).rename('NDVI');
-    return ndviValue.copyProperties(img, ['system:time_start']);
-  });
+  .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 20));
 
-var ndviSeries = ndvi.map(function(img) {
+var ndviCollection = collection.map(function(img) {
+  var ndvi = img.normalizedDifference(['B8', 'B4']).rename('NDVI');
+  return ndvi.copyProperties(img, ['system:time_start']);
+});
+
+var timeSeries = ndviCollection.map(function(img) {
   var value = img.reduceRegion({
     reducer: ee.Reducer.mean(),
     geometry: geometry,
     scale: 10,
     maxPixels: 1e9
   });
-  return ee.Feature(null, value).set('system:time_start', img.get('system:time_start'));
+  return ee.Feature(null, {
+    'NDVI': value.get('NDVI'),
+    'date': img.get('system:time_start')
+  });
 });
 
-ndviSeries;
-    `.trim();
+timeSeries;`.trim();
 
-    console.log('GEE Expression:', geeExpression);
+    console.log('🌍 Sending request to GEE...');
 
-    // Send request to GEE API
+    // Send request to GEE
     const geeResponse = await fetch(
       "https://earthengine.googleapis.com/v1/projects/earthengine-public:compute",
       {
@@ -154,61 +116,49 @@ ndviSeries;
           "Authorization": `Bearer ${tokenData.access_token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          expression: geeExpression,
-        }),
+        body: JSON.stringify({ expression: geeExpression }),
       }
     );
 
-    const geeData = await geeResponse.json();
-    console.log('GEE Response:', geeData);
-
     if (!geeResponse.ok) {
-      throw new Error(`GEE API error: ${JSON.stringify(geeData)}`);
+      const errorText = await geeResponse.text();
+      throw new Error(`GEE API error: ${geeResponse.status} - ${errorText}`);
     }
 
-    // Check if we got an operation ID (for async operations)
+    const geeData = await geeResponse.json();
+    console.log('📊 GEE Response received:', geeData);
+
+    // Handle async operations
     if (geeData.name) {
-      console.log('Polling operation:', geeData.name);
+      console.log('⏳ Polling operation:', geeData.name);
       
-      // Poll for completion
-      let operationComplete = false;
-      let attempts = 0;
-      const maxAttempts = 30;
-      
-      while (!operationComplete && attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+      for (let attempt = 0; attempt < 15; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
         
         const pollResponse = await fetch(
           `https://earthengine.googleapis.com/v1/${geeData.name}`,
           {
-            headers: {
-              "Authorization": `Bearer ${tokenData.access_token}`,
-            },
+            headers: { "Authorization": `Bearer ${tokenData.access_token}` }
           }
         );
         
         const pollData = await pollResponse.json();
-        console.log(`Poll attempt ${attempts + 1}:`, pollData);
         
         if (pollData.done) {
-          operationComplete = true;
-          
           if (pollData.error) {
             throw new Error(`GEE operation failed: ${JSON.stringify(pollData.error)}`);
           }
           
-          // Extract and format NDVI time series data
           const features = pollData.result?.features || [];
           const timeSeries = features
             .map((feature: any) => ({
-              date: new Date(parseInt(feature.properties['system:time_start'])),
-              ndvi: feature.properties.NDVI || 0
+              date: new Date(parseInt(feature.properties.date || feature.properties['system:time_start'])),
+              ndvi: parseFloat(feature.properties.NDVI || 0)
             }))
-            .filter((point: any) => !isNaN(point.ndvi) && point.ndvi !== null)
+            .filter((point: any) => !isNaN(point.ndvi) && point.ndvi !== null && isFinite(point.ndvi))
             .sort((a: any, b: any) => a.date.getTime() - b.date.getTime());
 
-          console.log('Processed time series:', timeSeries);
+          console.log(`✅ Success! ${timeSeries.length} NDVI points processed`);
 
           return new Response(
             JSON.stringify({
@@ -223,22 +173,22 @@ ndviSeries;
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
-        
-        attempts++;
       }
       
-      throw new Error('Operation timed out after 60 seconds');
+      throw new Error('Operation timed out');
     }
 
-    // Direct response (synchronous)
+    // Handle direct response
     const features = geeData.features || [];
     const timeSeries = features
       .map((feature: any) => ({
-        date: new Date(parseInt(feature.properties['system:time_start'])),
-        ndvi: feature.properties.NDVI || 0
+        date: new Date(parseInt(feature.properties.date || feature.properties['system:time_start'])),
+        ndvi: parseFloat(feature.properties.NDVI || 0)
       }))
-      .filter((point: any) => !isNaN(point.ndvi) && point.ndvi !== null)
+      .filter((point: any) => !isNaN(point.ndvi) && point.ndvi !== null && isFinite(point.ndvi))
       .sort((a: any, b: any) => a.date.getTime() - b.date.getTime());
+
+    console.log(`✅ Success! ${timeSeries.length} NDVI points processed`);
 
     return new Response(
       JSON.stringify({
@@ -254,11 +204,11 @@ ndviSeries;
     );
 
   } catch (error) {
-    console.error('NDVI calculation error:', error);
+    console.error('❌ NDVI Error:', error);
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message
+        error: error.message || 'Unknown error occurred'
       }),
       {
         status: 500,
