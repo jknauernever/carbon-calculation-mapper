@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
@@ -35,7 +34,7 @@ export const GEELayerToggle: React.FC<GEELayerToggleProps> = ({
   onLayerToggle,
   onLayerOpacityChange,
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
   const [layers, setLayers] = useState<GEELayer[]>([
     {
       id: 'ndvi',
@@ -111,94 +110,86 @@ export const GEELayerToggle: React.FC<GEELayerToggleProps> = ({
   const enabledLayers = layers.filter(layer => layer.enabled);
 
   return (
-    <div className="absolute top-4 right-4 z-10 w-80">
-      <Card className="bg-background/95 backdrop-blur-sm border shadow-lg">
-        <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-          <CollapsibleTrigger asChild>
-            <CardHeader className="pb-3 cursor-pointer hover:bg-accent/50 transition-colors">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Layers className="w-5 h-5" />
-                  <CardTitle className="text-base">Data Layers</CardTitle>
-                  {enabledLayers.length > 0 && (
-                    <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded-full">
-                      {enabledLayers.length}
-                    </span>
-                  )}
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <CollapsibleTrigger asChild>
+        <Button variant="ghost" className="w-full justify-between p-2 mb-2">
+          <div className="flex items-center gap-2">
+            <Layers className="w-4 h-4" />
+            <span className="font-medium">Available Layers</span>
+            {enabledLayers.length > 0 && (
+              <span className="text-xs bg-primary text-primary-foreground px-2 py-1 rounded-full">
+                {enabledLayers.length}
+              </span>
+            )}
+          </div>
+          {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </Button>
+      </CollapsibleTrigger>
+      
+      <CollapsibleContent className="space-y-4">
+        {layers.map(layer => (
+          <div key={layer.id} className="space-y-3 p-3 border border-border rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {layer.icon}
+                <div>
+                  <p className="text-sm font-medium">{layer.name}</p>
+                  <p className="text-xs text-muted-foreground">{layer.description}</p>
                 </div>
-                {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
               </div>
-            </CardHeader>
-          </CollapsibleTrigger>
-          
-          <CollapsibleContent>
-            <CardContent className="pt-0 space-y-4">
-              {layers.map(layer => (
-                <div key={layer.id} className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      {layer.icon}
-                      <div>
-                        <p className="text-sm font-medium">{layer.name}</p>
-                        <p className="text-xs text-muted-foreground">{layer.description}</p>
-                      </div>
-                    </div>
-                    <Switch
-                      checked={layer.enabled}
-                      onCheckedChange={() => handleLayerToggle(layer.id)}
+              <Switch
+                checked={layer.enabled}
+                onCheckedChange={() => handleLayerToggle(layer.id)}
+              />
+            </div>
+            
+            {layer.enabled && (
+              <div className="ml-6 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Opacity:</span>
+                  <div className="flex-1">
+                    <Slider
+                      value={[layer.opacity]}
+                      onValueChange={(value) => handleOpacityChange(layer.id, value)}
+                      max={100}
+                      min={0}
+                      step={10}
+                      className="w-full"
                     />
                   </div>
-                  
-                  {layer.enabled && (
-                    <div className="ml-6 space-y-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground">Opacity:</span>
-                        <div className="flex-1">
-                          <Slider
-                            value={[layer.opacity]}
-                            onValueChange={(value) => handleOpacityChange(layer.id, value)}
-                            max={100}
-                            min={0}
-                            step={10}
-                            className="w-full"
-                          />
-                        </div>
-                        <span className="text-xs text-muted-foreground w-8">{layer.opacity}%</span>
-                      </div>
-                      
-                      {/* Legend */}
-                      <div className="space-y-1">
-                        <p className="text-xs font-medium text-muted-foreground">Legend:</p>
-                        <div className="grid grid-cols-1 gap-1">
-                          {layer.legendColors.map((color, index) => (
-                            <div key={index} className="flex items-center gap-2">
-                              <div 
-                                className="w-3 h-3 rounded border border-border"
-                                style={{ backgroundColor: color }}
-                              />
-                              <span className="text-xs text-muted-foreground">
-                                {layer.legendLabels[index]}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  <span className="text-xs text-muted-foreground w-8">{layer.opacity}%</span>
                 </div>
-              ))}
-              
-              {enabledLayers.length === 0 && (
-                <div className="text-center py-4">
-                  <p className="text-sm text-muted-foreground">
-                    Enable layers above to visualize satellite data
-                  </p>
+                
+                {/* Legend */}
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Legend:</p>
+                  <div className="grid grid-cols-1 gap-1">
+                    {layer.legendColors.map((color, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <div 
+                          className="w-3 h-3 rounded border border-border"
+                          style={{ backgroundColor: color }}
+                        />
+                        <span className="text-xs text-muted-foreground">
+                          {layer.legendLabels[index]}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              )}
-            </CardContent>
-          </CollapsibleContent>
-        </Collapsible>
-      </Card>
-    </div>
+              </div>
+            )}
+          </div>
+        ))}
+        
+        {enabledLayers.length === 0 && (
+          <div className="text-center py-4">
+            <p className="text-sm text-muted-foreground">
+              Enable layers above to visualize satellite data
+            </p>
+          </div>
+        )}
+      </CollapsibleContent>
+    </Collapsible>
   );
 };
