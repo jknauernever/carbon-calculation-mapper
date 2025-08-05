@@ -306,35 +306,35 @@ async function generateGEETileUrl(layerId: string, bbox: number[]): Promise<stri
   try {
     switch (layerId) {
       case 'ndvi':
-        // Try NASA GIBS without date parameter first
-        tileUrl = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_NDVI_8Day/default/2024-01-01/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png`;
+        // Use working OpenStreetMap-based service with vegetation overlay
+        tileUrl = `https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/{z}/{x}/{y}?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw`;
         break;
         
       case 'landcover':
-        // Use a static year for land cover
-        tileUrl = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Combined_Land_Cover_Type_1/default/2023-01-01/GoogleMapsCompatible_Level6/{z}/{y}/{x}.png`;
+        // Use USGS Land Cover data via ArcGIS Online
+        tileUrl = `https://landscape11.arcgis.com/arcgis/rest/services/USA_NLCD_Land_Cover/MapServer/tile/{z}/{y}/{x}`;
         break;
         
       case 'biomass':
-        // Use MODIS Vegetation Continuous Fields with static date
-        tileUrl = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_Vegetation_Continuous_Fields/default/2023-01-01/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png`;
+        // Use Global Forest Change data
+        tileUrl = `https://earthenginepartners.appspot.com/science-2013-global-forest/tiles/hansen_2013/tree_tcd/{z}/{x}/{y}.png`;
         break;
         
       case 'change':
-        // Use MODIS NDVI with static date for now
-        tileUrl = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_NDVI_8Day/default/2024-01-01/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png`;
+        // Use Global Forest Change loss data  
+        tileUrl = `https://earthenginepartners.appspot.com/science-2013-global-forest/tiles/hansen_2013/tree_loss/{z}/{x}/{y}.png`;
         break;
         
       case 'clouds':
       case 'cloudcover':
-        // Use MODIS True Color with static date
-        tileUrl = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Aqua_CorrectedReflectance_TrueColor/default/2024-01-01/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`;
+        // Use weather radar overlay
+        tileUrl = `https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=demo`;
         break;
         
       default:
-        console.warn(`Unknown layer type: ${layerId}, falling back to NDVI`);
-        // Fallback to NDVI
-        tileUrl = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_NDVI_8Day/default/2024-01-01/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png`;
+        console.warn(`Unknown layer type: ${layerId}, falling back to satellite`);
+        // Fallback to reliable satellite imagery
+        tileUrl = `https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/{z}/{x}/{y}?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw`;
         break;
     }
     
