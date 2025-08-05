@@ -4,6 +4,7 @@ import { Progress } from "@/components/ui/progress";
 import { TreePine, Wheat, Mountain, Download, FileText } from "lucide-react";
 import { useProperty } from "@/hooks/useProperty";
 import { GEEDataVisualization } from "./GEEDataVisualization";
+import { CarbonMethodologyInfo } from "./CarbonMethodologyInfo";
 
 export const CarbonResults = () => {
   const { selectedProperty, carbonCalculation } = useProperty();
@@ -68,7 +69,10 @@ export const CarbonResults = () => {
         {/* Total Carbon Summary */}
         <Card className="lg:col-span-1 border-primary/20 bg-gradient-earth">
           <CardHeader className="text-center pb-4">
-            <CardTitle className="text-2xl text-primary">Total Carbon Storage</CardTitle>
+            <CardTitle className="flex items-center justify-center gap-2 text-2xl text-primary">
+              Total Carbon Storage
+              <CarbonMethodologyInfo />
+            </CardTitle>
           </CardHeader>
           <CardContent className="text-center space-y-4">
             <div>
