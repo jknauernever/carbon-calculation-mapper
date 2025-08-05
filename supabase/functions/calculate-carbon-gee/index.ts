@@ -293,40 +293,55 @@ function calculateCarbonFromRealData(
 async function generateGEETileUrl(layerId: string, bbox: number[]): Promise<string> {
   console.log(`Generating tile URL for layer: ${layerId}`);
   
+  // Get current date for time-series data (NASA GIBS requires date parameter)
+  const currentDate = new Date();
+  const dateString = currentDate.toISOString().split('T')[0]; // Format: YYYY-MM-DD
+  
   let tileUrl: string;
   
-  switch (layerId) {
-    case 'ndvi':
-      // Use working satellite imagery with false color for vegetation
-      tileUrl = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}`;
-      break;
-      
-    case 'landcover':
-      // Use a working terrain/landcover basemap
-      tileUrl = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}`;
-      break;
-      
-    case 'biomass':
-      // Use shaded relief to simulate biomass density
-      tileUrl = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}`;
-      break;
-      
-    case 'change':
-      // Use physical map to show landscape changes
-      tileUrl = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Physical_Map/MapServer/tile/{z}/{y}/{x}`;
-      break;
-      
-    case 'clouds':
-      // Use street map with reduced opacity to simulate cloud overlay
-      tileUrl = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}`;
-      break;
-      
-    default:
-      // Fallback to satellite imagery
-      tileUrl = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}`;
-      break;
+  try {
+    switch (layerId) {
+      case 'ndvi':
+        // Real MODIS NDVI data from NASA GIBS (8-day composite)
+        tileUrl = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_NDVI_8Day/default/${dateString}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png`;
+        break;
+        
+      case 'landcover':
+        // MODIS Land Cover Type classification
+        tileUrl = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Combined_Land_Cover_Type_1/default/${dateString}/GoogleMapsCompatible_Level6/{z}/{y}/{x}.png`;
+        break;
+        
+      case 'biomass':
+        // MODIS Vegetation Continuous Fields (proxy for biomass)
+        tileUrl = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_Vegetation_Continuous_Fields/default/${dateString}/GoogleMapsCompatible_Level8/{z}/{y}/{x}.png`;
+        break;
+        
+      case 'change':
+        // MODIS NDVI for change detection (could compare different dates)
+        tileUrl = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_NDVI_8Day/default/${dateString}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png`;
+        break;
+        
+      case 'clouds':
+      case 'cloudcover':
+        // MODIS True Color with cloud visibility
+        tileUrl = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Aqua_CorrectedReflectance_TrueColor/default/${dateString}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`;
+        break;
+        
+      default:
+        console.warn(`Unknown layer type: ${layerId}, falling back to NDVI`);
+        // Fallback to NDVI
+        tileUrl = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_NDVI_8Day/default/${dateString}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png`;
+        break;
+    }
+    
+    console.log(`Generated NASA GIBS tile URL for ${layerId}: ${tileUrl}`);
+    return tileUrl;
+    
+  } catch (error) {
+    console.error(`Error generating tile URL for ${layerId}:`, error);
+    // Fallback to working satellite imagery if NASA GIBS fails
+    const fallbackUrl = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}`;
+    console.log(`Using fallback URL: ${fallbackUrl}`);
+    return fallbackUrl;
   }
-  
-  console.log(`Generated tile URL for ${layerId}: ${tileUrl}`);
-  return tileUrl;
 }
