@@ -423,52 +423,8 @@ export const MapInterface = () => {
       </Card>
 
       <div className="grid lg:grid-cols-4 gap-6">
-        {/* Selected Area Info */}
-        <div className="lg:col-span-1 order-2 lg:order-1">
-          {selectedArea && (
-            <Card className="border-primary/20 bg-primary/5">
-              <CardHeader>
-                <CardTitle className="text-lg text-primary">Selected Area</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span>Area:</span>
-                    <span className="font-medium">{selectedArea.area_hectares.toFixed(2)} ha</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Resolution:</span>
-                    <span className="font-medium">10m pixels</span>
-                  </div>
-                  {carbonCalculation && (
-                    <div className="border-t pt-2 mt-2">
-                      <div className="flex justify-between items-center">
-                        <span>Carbon Storage:</span>
-                        <div className="flex items-center gap-1">
-                          <span className="font-medium text-primary">{carbonCalculation.total_co2e.toFixed(1)} t CO₂e</span>
-                          <CarbonMethodologyInfo />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  {!carbonCalculation && (
-                    <Button 
-                      className="w-full mt-4" 
-                      size="sm"
-                      onClick={() => calculateCarbonForArea(selectedArea.coordinates, selectedArea.area_hectares)}
-                      disabled={calculationLoading}
-                    >
-                      {calculationLoading ? 'Calculating...' : 'Calculate Carbon Storage'}
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-
         {/* Map */}
-        <div className="lg:col-span-3 order-1 lg:order-2">
+        <div className="lg:col-span-3 order-1">
           <Card className="h-[600px] relative">
             <CardContent className="p-0 h-full">
               <div 
@@ -527,6 +483,50 @@ export const MapInterface = () => {
               )}
             </CardContent>
           </Card>
+        </div>
+
+        {/* Selected Area Info */}
+        <div className="lg:col-span-1 order-2">
+          {selectedArea && (
+            <Card className="border-primary/20 bg-primary/5">
+              <CardHeader>
+                <CardTitle className="text-lg text-primary">Selected Area</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span>Area:</span>
+                    <span className="font-medium">{selectedArea.area_hectares.toFixed(2)} ha</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Resolution:</span>
+                    <span className="font-medium">10m pixels</span>
+                  </div>
+                  {carbonCalculation && (
+                    <div className="border-t pt-2 mt-2">
+                      <div className="flex justify-between items-center">
+                        <span>Carbon Storage:</span>
+                        <div className="flex items-center gap-1">
+                          <span className="font-medium text-primary">{carbonCalculation.total_co2e.toFixed(1)} t CO₂e</span>
+                          <CarbonMethodologyInfo />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {!carbonCalculation && (
+                    <Button 
+                      className="w-full mt-4" 
+                      size="sm"
+                      onClick={() => calculateCarbonForArea(selectedArea.coordinates, selectedArea.area_hectares)}
+                      disabled={calculationLoading}
+                    >
+                      {calculationLoading ? 'Calculating...' : 'Calculate Carbon Storage'}
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>
