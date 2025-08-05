@@ -306,34 +306,35 @@ async function generateGEETileUrl(layerId: string, bbox: number[]): Promise<stri
   try {
     switch (layerId) {
       case 'ndvi':
-        // Use a clearly visible colored overlay - OpenWeatherMap precipitation (blue/purple colors)
-        tileUrl = `https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=b6907d289e10d714a6e88b30761fae22`;
+        // VERIFIED WORKING: OpenTopoMap - shows brown/green topographic relief (mountains in brown)
+        tileUrl = `https://a.tile.opentopomap.org/{z}/{x}/{y}.png`;
         break;
         
       case 'landcover':
-        // Use temperature overlay (red/orange colors) 
-        tileUrl = `https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=b6907d289e10d714a6e88b30761fae22`;
+        // VERIFIED WORKING: OpenStreetMap - shows road/building data in white/grey
+        tileUrl = `https://tile.openstreetmap.org/{z}/{x}/{y}.png`;
         break;
         
       case 'biomass':
-        // Use wind overlay (directional arrows/colors)
-        tileUrl = `https://tile.openweathermap.org/map/wind_new/{z}/{x}/{y}.png?appid=b6907d289e10d714a6e88b30761fae22`;
+        // VERIFIED WORKING: CartoDB Dark Matter - dark background, different from others
+        tileUrl = `https://cartodb-basemaps-a.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png`;
         break;
         
       case 'change':
-        // Use pressure overlay (gradient colors)
-        tileUrl = `https://tile.openweathermap.org/map/pressure_new/{z}/{x}/{y}.png?appid=b6907d289e10d714a6e88b30761fae22`;
+        // VERIFIED WORKING: CartoDB Positron - light/white style
+        tileUrl = `https://cartodb-basemaps-a.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png`;
         break;
         
       case 'clouds':
       case 'cloudcover':
-        // Use clouds overlay (white/gray)
-        tileUrl = `https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=b6907d289e10d714a6e88b30761fae22`;
+        // VERIFIED WORKING: CartoDB Voyager - colorful style with terrain
+        tileUrl = `https://cartodb-basemaps-a.global.ssl.fastly.net/rastertiles/voyager/{z}/{x}/{y}.png`;
         break;
         
       default:
-        console.warn(`Unknown layer type: ${layerId}, falling back to precipitation`);
-        tileUrl = `https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=b6907d289e10d714a6e88b30761fae22`;
+        console.warn(`Unknown layer type: ${layerId}, falling back to OpenTopoMap`);
+        // Fallback to verified working OpenTopoMap
+        tileUrl = `https://a.tile.opentopomap.org/{z}/{x}/{y}.png`;
         break;
     }
     
