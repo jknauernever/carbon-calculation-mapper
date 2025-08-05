@@ -4,7 +4,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, Square, MapPin } from "lucide-react";
+import { Search, Square, MapPin, Edit3 } from "lucide-react";
 import { toast } from "sonner";
 import { CarbonMethodologyInfo } from "./CarbonMethodologyInfo";
 import { supabase } from "@/integrations/supabase/client";
@@ -389,75 +389,42 @@ export const MapInterface = () => {
         </Card>
       )}
 
-      <div className="grid md:grid-cols-4 gap-6">
-        {/* Controls Panel */}
-        <div className="md:col-span-1 space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Area Selection</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Address Search */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Search by Address</label>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Enter address, city, or location..."
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleAddressSearch()}
-                  />
-                  <Button size="sm" onClick={handleAddressSearch}>
-                    <Search className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-
-              {/* Draw Boundary */}
-              <div className="space-y-2">
-                <Button 
-                  variant={drawingMode ? "default" : "outline"} 
-                  className="w-full justify-start"
-                  onClick={() => setDrawingMode(!drawingMode)}
-                >
-                  <Square className="w-4 h-4 mr-2" />
-                  {drawingMode ? 'Stop Drawing' : 'Draw Area Boundary'}
-                </Button>
-                
-                {drawingMode && (
-                  <div className="text-xs text-muted-foreground pl-6">
-                    Click map to add points. Need 3+ points for polygon.
-                    {drawingPoints.length > 0 && (
-                      <div className="mt-1">
-                        Points: {drawingPoints.length}
-                        {drawingPoints.length >= 3 && (
-                          <Button 
-                            size="sm" 
-                            className="ml-2 h-6"
-                            onClick={finishDrawing}
-                          >
-                            Calculate Carbon
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Clear Map */}
-              <Button 
-                variant="outline" 
-                className="w-full justify-start"
-                onClick={clearMap}
-              >
-                <Square className="w-4 h-4 mr-2" />
-                Clear Map
+      {/* Area Selection Controls */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="text-lg">Area Selection</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row gap-4">
+            {/* Address Search */}
+            <div className="flex-1 flex gap-2">
+              <Input
+                placeholder="Enter address, city, or location..."
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleAddressSearch()}
+                className="flex-1"
+              />
+              <Button size="sm" onClick={handleAddressSearch}>
+                <Search className="w-4 h-4" />
               </Button>
-            </CardContent>
-          </Card>
+            </div>
 
-          {/* Selected Area Info */}
+            {/* Clear Map */}
+            <Button 
+              variant="outline" 
+              onClick={clearMap}
+            >
+              <Square className="w-4 h-4 mr-2" />
+              Clear Map
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid lg:grid-cols-4 gap-6">
+        {/* Selected Area Info */}
+        <div className="lg:col-span-1 order-2 lg:order-1">
           {selectedArea && (
             <Card className="border-primary/20 bg-primary/5">
               <CardHeader>
@@ -501,14 +468,55 @@ export const MapInterface = () => {
         </div>
 
         {/* Map */}
-        <div className="md:col-span-3">
-          <Card className="h-[600px]">
+        <div className="lg:col-span-3 order-1 lg:order-2">
+          <Card className="h-[600px] relative">
             <CardContent className="p-0 h-full">
               <div 
                 ref={mapContainer} 
                 className="w-full h-full rounded-lg"
                 style={{ minHeight: '600px' }}
               />
+              
+              {/* Floating Draw Toggle */}
+              <div className="absolute top-4 left-4 z-10">
+                <Button
+                  size="sm"
+                  variant={drawingMode ? "default" : "outline"}
+                  className="shadow-lg bg-background/90 backdrop-blur-sm border"
+                  onClick={() => setDrawingMode(!drawingMode)}
+                >
+                  <Edit3 className="w-4 h-4 mr-2" />
+                  {drawingMode ? 'Stop Drawing' : 'Draw Area'}
+                </Button>
+              </div>
+
+              {/* Drawing Instructions */}
+              {drawingMode && (
+                <div className="absolute top-16 left-4 z-10">
+                  <Card className="bg-background/90 backdrop-blur-sm border shadow-lg">
+                    <CardContent className="p-3">
+                      <div className="text-xs text-muted-foreground">
+                        Click map to add points. Need 3+ points for polygon.
+                        {drawingPoints.length > 0 && (
+                          <div className="mt-1">
+                            Points: {drawingPoints.length}
+                            {drawingPoints.length >= 3 && (
+                              <Button 
+                                size="sm" 
+                                className="ml-2 h-6"
+                                onClick={finishDrawing}
+                              >
+                                Calculate Carbon
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+
               {!map.current && (
                 <div className="absolute inset-0 flex items-center justify-center bg-muted/50 rounded-lg">
                   <div className="text-center">
