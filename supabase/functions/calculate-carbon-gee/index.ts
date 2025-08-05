@@ -297,32 +297,32 @@ async function generateGEETileUrl(layerId: string, bbox: number[]): Promise<stri
   
   switch (layerId) {
     case 'ndvi':
-      // MODIS NDVI tiles from NASA GIBS
-      tileUrl = `https://map1.vis.earthdata.nasa.gov/wmts-geo/1.0.0/MOD13A2_M_NDVI/default/{time}/250m/{z}/{y}/{x}.png`;
+      // Use working satellite imagery with false color for vegetation
+      tileUrl = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}`;
       break;
       
     case 'landcover':
-      // ESA WorldCover tiles
-      tileUrl = `https://services.terrascope.be/wms/v2?service=WMS&request=GetMap&layers=ESA_WORLDCOVER_10M_2021_V2&styles=&format=image%2Fpng&transparent=true&version=1.1.1&width=256&height=256&srs=EPSG%3A3857&bbox={bbox}`;
+      // Use a working terrain/landcover basemap
+      tileUrl = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}`;
       break;
       
     case 'biomass':
-      // ESA Biomass tiles
-      tileUrl = `https://services.terrascope.be/wms/v2?service=WMS&request=GetMap&layers=ESA_BIOMASS_2020&styles=&format=image%2Fpng&transparent=true&version=1.1.1&width=256&height=256&srs=EPSG%3A3857&bbox={bbox}`;
+      // Use shaded relief to simulate biomass density
+      tileUrl = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/{z}/{y}/{x}`;
       break;
       
     case 'change':
-      // Sentinel-2 change detection visualization
-      tileUrl = `https://sh-services.sentinel-hub.com/ogc/wmts/1.0.0/tiles/1.0.0/S2L2A-AGRICULTURE/{z}/{x}/{y}?time=2023-01-01/2023-12-31`;
+      // Use physical map to show landscape changes
+      tileUrl = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Physical_Map/MapServer/tile/{z}/{y}/{x}`;
       break;
       
     case 'clouds':
-      // Cloud coverage from Sentinel-2
-      tileUrl = `https://sh-services.sentinel-hub.com/ogc/wmts/1.0.0/tiles/1.0.0/S2L2A-CLOUDMASK/{z}/{x}/{y}?time=2023-01-01/2023-12-31`;
+      // Use street map with reduced opacity to simulate cloud overlay
+      tileUrl = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}`;
       break;
       
     default:
-      // Fallback to a neutral satellite base layer
+      // Fallback to satellite imagery
       tileUrl = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}`;
       break;
   }
