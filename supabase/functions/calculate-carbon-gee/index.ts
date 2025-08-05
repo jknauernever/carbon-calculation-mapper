@@ -297,13 +297,26 @@ async function generateGEETileUrl(layerId: string, bbox: number[]): Promise<stri
     // Get GEE service account credentials
     const geeServiceAccount = Deno.env.get('GEE_SERVICE_ACCOUNT');
     if (!geeServiceAccount) {
-      throw new Error('GEE_SERVICE_ACCOUNT not configured');
+      throw new Error('GEE_SERVICE_ACCOUNT not configured. Please add your service account JSON in the Supabase dashboard.');
     }
 
     console.log('🔐 Authenticating with Google Earth Engine...');
     
-    // Parse service account JSON
-    const serviceAccount = JSON.parse(geeServiceAccount);
+    // Parse service account JSON with better error handling
+    let serviceAccount;
+    try {
+      serviceAccount = JSON.parse(geeServiceAccount);
+      
+      // Validate required fields
+      if (!serviceAccount.private_key || !serviceAccount.client_email || !serviceAccount.project_id) {
+        throw new Error('Service account missing required fields (private_key, client_email, project_id)');
+      }
+      
+      console.log(`✅ Service account loaded for project: ${serviceAccount.project_id}`);
+    } catch (parseError) {
+      console.error('❌ Failed to parse GEE service account JSON:', parseError);
+      throw new Error(`Invalid service account JSON format: ${parseError.message}`);
+    }
     
     // Get OAuth token for GEE
     const authToken = await getGEEAuthToken(serviceAccount);
