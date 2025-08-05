@@ -338,7 +338,37 @@ async function generateGEETileUrl(layerId: string, bbox: number[]): Promise<stri
         break;
     }
     
-    console.log(`Generated NASA GIBS tile URL for ${layerId}: ${tileUrl}`);
+    console.log(`Generated tile URL for ${layerId}: ${tileUrl}`);
+    
+    // TEST THE URL: Try to validate the tile service by testing a specific tile
+    try {
+      const testTileUrl = tileUrl
+        .replace('{z}', '5')
+        .replace('{x}', '16')
+        .replace('{y}', '11');
+      
+      console.log(`🧪 TESTING TILE URL: ${testTileUrl}`);
+      
+      const testResponse = await fetch(testTileUrl, { 
+        method: 'HEAD',
+        signal: AbortSignal.timeout(5000) // 5 second timeout
+      });
+      
+      console.log(`✅ TILE TEST RESULT for ${layerId}:`, {
+        status: testResponse.status,
+        statusText: testResponse.statusText,
+        contentType: testResponse.headers.get('content-type'),
+        isWorking: testResponse.status === 200
+      });
+      
+      if (testResponse.status !== 200) {
+        console.warn(`⚠️ WARNING: Tile service for ${layerId} returned ${testResponse.status}`);
+      }
+      
+    } catch (testError) {
+      console.error(`❌ TILE TEST FAILED for ${layerId}:`, testError);
+    }
+    
     return tileUrl;
     
   } catch (error) {
