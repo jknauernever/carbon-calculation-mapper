@@ -41,15 +41,25 @@ export const MapInterface = () => {
   useEffect(() => {
     const fetchMapboxToken = async () => {
       try {
+        console.log('Fetching Mapbox token...');
         const { data, error } = await supabase.functions.invoke('get-mapbox-token');
-        if (error) throw error;
+        
+        if (error) {
+          console.error('Supabase function error:', error);
+          throw error;
+        }
+        
         if (data?.token) {
+          console.log('Mapbox token received successfully');
           setMapboxToken(data.token);
           initializeMap(data.token);
+        } else {
+          console.error('No token in response:', data);
+          toast.error('Mapbox token not found. Please add MAPBOX_PUBLIC_TOKEN to Supabase Edge Function secrets.');
         }
       } catch (error) {
         console.error('Error fetching Mapbox token:', error);
-        toast.error('Failed to load map. Please check configuration.');
+        toast.error('Failed to load map. Please configure Mapbox token in Supabase secrets.');
       }
     };
 
@@ -433,7 +443,14 @@ export const MapInterface = () => {
             <div className="absolute inset-0 flex items-center justify-center bg-background/80">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-                <p className="mt-4 text-muted-foreground">Loading map...</p>
+                <p className="mt-4 text-muted-foreground">
+                  {mapboxToken ? 'Loading map...' : 'Fetching map configuration...'}
+                </p>
+                {!mapboxToken && (
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    If this takes too long, check your Mapbox token configuration
+                  </p>
+                )}
               </div>
             </div>
           )}
