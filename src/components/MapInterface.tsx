@@ -231,6 +231,62 @@ export const MapInterface = () => {
     setActiveLayers({});
   };
 
+  // Test GEE Authentication function
+  const testGEEAuthentication = async () => {
+    setIsCalculating(true);
+    try {
+      console.log('🧪 Testing GEE Authentication...');
+      
+      // Test authentication by trying to generate a tile URL
+      const { data, error } = await supabase.functions.invoke('calculate-carbon-gee', {
+        body: {
+          action: 'getTileUrl',
+          layerId: 'ndvi',
+          bbox: [-100, 35, -95, 40] // Sample bounding box
+        },
+      });
+
+      if (error) {
+        console.error('❌ GEE Authentication test failed:', error);
+        toast.error(`GEE Auth failed: ${error.message}`);
+        return;
+      }
+
+      console.log('✅ GEE Authentication test successful:', data);
+      toast.success('GEE Authentication is working!');
+      
+      // Also test tile URL validity
+      if (data.tileUrl) {
+        const testTileUrl = data.tileUrl
+          .replace('{z}', '5')
+          .replace('{x}', '10') 
+          .replace('{y}', '12');
+        
+        console.log('🔗 Testing tile URL:', testTileUrl);
+        
+        try {
+          const response = await fetch(testTileUrl, { method: 'HEAD' });
+          console.log('📊 Tile response:', response.status, response.statusText);
+          
+          if (response.ok) {
+            toast.success('Tile URL is accessible!');
+          } else {
+            toast.warning(`Tile URL returned ${response.status}: ${response.statusText}`);
+          }
+        } catch (tileError) {
+          console.error('🔗 Tile URL test failed:', tileError);
+          toast.warning('Tile URL test failed - this may be normal for some layers');
+        }
+      }
+      
+    } catch (error) {
+      console.error('❌ Authentication test error:', error);
+      toast.error('Authentication test failed');
+    } finally {
+      setIsCalculating(false);
+    }
+  };
+
   const calculateCarbonForArea = async () => {
     if (!selectedArea) return;
 
@@ -487,6 +543,15 @@ export const MapInterface = () => {
               <Button variant="outline" onClick={clearMap} size="sm">
                 <RotateCcw className="w-4 h-4 mr-2" />
                 Clear
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={testGEEAuthentication} 
+                disabled={isCalculating}
+                size="sm"
+                className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+              >
+                🧪 Test GEE
               </Button>
             </div>
           </div>
