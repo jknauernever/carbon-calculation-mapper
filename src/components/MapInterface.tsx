@@ -496,7 +496,10 @@ export const MapInterface = () => {
               <div className="flex gap-2 mb-4">
                 <Button
                   variant={activePanel === 'carbon' ? 'default' : 'outline'}
-                  onClick={() => setActivePanel('carbon')}
+                  onClick={() => {
+                    console.log('Switching to carbon panel');
+                    setActivePanel('carbon');
+                  }}
                   className="flex-1"
                   size="sm"
                 >
@@ -504,7 +507,10 @@ export const MapInterface = () => {
                 </Button>
                 <Button
                   variant={activePanel === 'ndvi' ? 'default' : 'outline'}
-                  onClick={() => setActivePanel('ndvi')}
+                  onClick={() => {
+                    console.log('Switching to NDVI panel');
+                    setActivePanel('ndvi');
+                  }}
                   className="flex-1"
                   size="sm"
                 >
