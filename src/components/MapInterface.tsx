@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Search, Square, MapPin, Edit3 } from "lucide-react";
 import { toast } from "sonner";
 import { CarbonMethodologyInfo } from "./CarbonMethodologyInfo";
+import { GEELayerToggle } from "./GEELayerToggle";
 import { supabase } from "@/integrations/supabase/client";
 
 interface CarbonCalculation {
@@ -34,6 +35,192 @@ export const MapInterface = () => {
   const [carbonCalculation, setCarbonCalculation] = useState<CarbonCalculation | null>(null);
   const [calculationLoading, setCalculationLoading] = useState(false);
   const [searchMarker, setSearchMarker] = useState<mapboxgl.Marker | null>(null);
+  
+  // GEE Layer management
+  const addGEELayer = (layerId: string, opacity: number) => {
+    if (!map.current) return;
+    
+    // Mock GEE layer data - in real implementation, this would fetch from GEE
+    const mockLayerData = generateMockGEELayer(layerId, selectedArea?.coordinates);
+    
+    try {
+      // Remove existing layer if it exists
+      if (map.current.getLayer(`gee-${layerId}`)) {
+        map.current.removeLayer(`gee-${layerId}`);
+      }
+      if (map.current.getSource(`gee-${layerId}`)) {
+        map.current.removeSource(`gee-${layerId}`);
+      }
+      
+      // Add new layer source
+      map.current.addSource(`gee-${layerId}`, {
+        type: 'geojson',
+        data: mockLayerData
+      });
+      
+      // Add layer with specific styling based on layer type
+      const layerStyle = getLayerStyle(layerId, opacity);
+      map.current.addLayer({
+        id: `gee-${layerId}`,
+        type: layerStyle.type,
+        source: `gee-${layerId}`,
+        paint: layerStyle.paint
+      });
+      
+      toast(`${layerId.toUpperCase()} layer added to map`);
+    } catch (error) {
+      console.error(`Error adding ${layerId} layer:`, error);
+      toast.error(`Failed to add ${layerId} layer`);
+    }
+  };
+  
+  const removeGEELayer = (layerId: string) => {
+    if (!map.current) return;
+    
+    try {
+      if (map.current.getLayer(`gee-${layerId}`)) {
+        map.current.removeLayer(`gee-${layerId}`);
+      }
+      if (map.current.getSource(`gee-${layerId}`)) {
+        map.current.removeSource(`gee-${layerId}`);
+      }
+      toast(`${layerId.toUpperCase()} layer removed`);
+    } catch (error) {
+      console.error(`Error removing ${layerId} layer:`, error);
+    }
+  };
+  
+  const updateLayerOpacity = (layerId: string, opacity: number) => {
+    if (!map.current || !map.current.getLayer(`gee-${layerId}`)) return;
+    
+    const layerType = map.current.getLayer(`gee-${layerId}`).type;
+    const opacityProperty = layerType === 'fill' ? 'fill-opacity' : 'circle-opacity';
+    
+    map.current.setPaintProperty(`gee-${layerId}`, opacityProperty, opacity / 100);
+  };
+  
+  const generateMockGEELayer = (layerId: string, coordinates?: [number, number][]) => {
+    if (!coordinates || coordinates.length < 3) {
+      // Generate default grid for demo
+      return {
+        type: 'FeatureCollection' as const,
+        features: []
+      };
+    }
+    
+    // Generate mock data points within the selected area
+    const features = [];
+    const bounds = getBounds(coordinates);
+    
+    for (let i = 0; i < 50; i++) {
+      const lng = bounds.minLng + Math.random() * (bounds.maxLng - bounds.minLng);
+      const lat = bounds.minLat + Math.random() * (bounds.maxLat - bounds.minLat);
+      
+      features.push({
+        type: 'Feature' as const,
+        geometry: {
+          type: 'Point' as const,
+          coordinates: [lng, lat]
+        },
+        properties: {
+          value: Math.random(),
+          layerType: layerId
+        }
+      });
+    }
+    
+    return {
+      type: 'FeatureCollection' as const,
+      features
+    };
+  };
+  
+  const getBounds = (coordinates: [number, number][]) => {
+    const lngs = coordinates.map(coord => coord[0]);
+    const lats = coordinates.map(coord => coord[1]);
+    
+    return {
+      minLng: Math.min(...lngs),
+      maxLng: Math.max(...lngs),
+      minLat: Math.min(...lats),
+      maxLat: Math.max(...lats)
+    };
+  };
+  
+  const getLayerStyle = (layerId: string, opacity: number) => {
+    const baseOpacity = opacity / 100;
+    
+    switch (layerId) {
+      case 'ndvi':
+        return {
+          type: 'circle' as const,
+          paint: {
+            'circle-radius': 4,
+            'circle-color': '#22c55e', // Simplified for now
+            'circle-opacity': baseOpacity
+          }
+        };
+      case 'landcover':
+        return {
+          type: 'circle' as const,
+          paint: {
+            'circle-radius': 5,
+            'circle-color': '#3b82f6',
+            'circle-opacity': baseOpacity
+          }
+        };
+      case 'biomass':
+        return {
+          type: 'circle' as const,
+          paint: {
+            'circle-radius': 6,
+            'circle-color': '#f59e0b',
+            'circle-opacity': baseOpacity
+          }
+        };
+      case 'cloudcover':
+        return {
+          type: 'circle' as const,
+          paint: {
+            'circle-radius': 8,
+            'circle-color': '#ffffff',
+            'circle-opacity': baseOpacity * 0.7,
+            'circle-stroke-color': '#d1d5db',
+            'circle-stroke-width': 1
+          }
+        };
+      case 'change':
+        return {
+          type: 'circle' as const,
+          paint: {
+            'circle-radius': 4,
+            'circle-color': '#ef4444',
+            'circle-opacity': baseOpacity
+          }
+        };
+      default:
+        return {
+          type: 'circle' as const,
+          paint: {
+            'circle-radius': 3,
+            'circle-color': '#3b82f6',
+            'circle-opacity': baseOpacity
+          }
+        };
+    }
+  };
+  
+  const handleLayerToggle = (layerId: string, enabled: boolean) => {
+    if (enabled) {
+      addGEELayer(layerId, 70);
+    } else {
+      removeGEELayer(layerId);
+    }
+  };
+  
+  const handleLayerOpacityChange = (layerId: string, opacity: number) => {
+    updateLayerOpacity(layerId, opacity);
+  };
 
   // Fetch Mapbox token from Supabase secrets
   useEffect(() => {
@@ -472,6 +659,12 @@ export const MapInterface = () => {
                   </Card>
                 </div>
               )}
+
+              {/* GEE Layer Toggle */}
+              <GEELayerToggle 
+                onLayerToggle={handleLayerToggle}
+                onLayerOpacityChange={handleLayerOpacityChange}
+              />
 
               {!map.current && (
                 <div className="absolute inset-0 flex items-center justify-center bg-muted/50 rounded-lg">
