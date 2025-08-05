@@ -36,30 +36,43 @@ serve(async (req) => {
       iat: now
     };
 
-    const encoder = new TextEncoder();
-    const data = encoder.encode(
-      `${btoa(JSON.stringify(header))}.${btoa(JSON.stringify(payload))}`
-    );
+    // Create JWT manually (simplified approach)
+    const headerB64 = btoa(JSON.stringify(header)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+    const payloadB64 = btoa(JSON.stringify(payload)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+    
+    // For this simplified version, we'll use the private key from the service account
+    // Note: In production, you'd want proper RSA signing
+    const privateKeyPem = serviceAccount.private_key
+      .replace(/\\n/g, '\n')
+      .replace('-----BEGIN PRIVATE KEY-----', '')
+      .replace('-----END PRIVATE KEY-----', '')
+      .replace(/\s/g, '');
 
-    // Import private key for signing
+    // Import the private key
+    const privateKeyBuffer = Uint8Array.from(atob(privateKeyPem), c => c.charCodeAt(0));
     const privateKey = await crypto.subtle.importKey(
-      "pkcs8",
-      new TextEncoder().encode(serviceAccount.private_key),
+      'pkcs8',
+      privateKeyBuffer,
       {
-        name: "RSASSA-PKCS1-v1_5",
-        hash: "SHA-256",
+        name: 'RSASSA-PKCS1-v1_5',
+        hash: 'SHA-256',
       },
       false,
-      ["sign"]
+      ['sign']
     );
 
+    // Sign the JWT
+    const signData = new TextEncoder().encode(`${headerB64}.${payloadB64}`);
     const signature = await crypto.subtle.sign(
-      "RSASSA-PKCS1-v1_5",
+      'RSASSA-PKCS1-v1_5',
       privateKey,
-      data
+      signData
     );
 
-    const jwt = `${btoa(JSON.stringify(header))}.${btoa(JSON.stringify(payload))}.${btoa(String.fromCharCode(...new Uint8Array(signature)))}`;
+    const signatureB64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
+      .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+    
+    const jwt = `${headerB64}.${payloadB64}.${signatureB64}`;
 
     // Exchange JWT for access token
     const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
@@ -83,6 +96,7 @@ var geometry = ee.Geometry.Point([${longitude}, ${latitude}]);
 var ndvi = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')
   .filterDate('${startDate}', '${endDate}')
   .filterBounds(geometry)
+  .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 20))
   .map(function(img) {
     var ndviValue = img.normalizedDifference(['B8', 'B4']).rename('NDVI');
     return ndviValue.copyProperties(img, ['system:time_start']);
