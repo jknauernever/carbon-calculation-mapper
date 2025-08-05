@@ -1,13 +1,14 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, Square, MapPin, Edit3 } from "lucide-react";
+import { Search, Square, RotateCcw, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
-import { CarbonMethodologyInfo } from "./CarbonMethodologyInfo";
 import { GEELayerToggle } from "./GEELayerToggle";
+import { CarbonResults } from "./CarbonResults";
+import { GEEDataVisualization } from "./GEEDataVisualization";
 import { supabase } from "@/integrations/supabase/client";
 
 interface CarbonCalculation {
@@ -22,706 +23,486 @@ interface CarbonCalculation {
 export const MapInterface = () => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
-  const [mapboxToken, setMapboxToken] = useState('');
-  const [tokenLoading, setTokenLoading] = useState(true);
-  const [address, setAddress] = useState('');
+  const [isMapLoaded, setIsMapLoaded] = useState(false);
+  const [searchAddress, setSearchAddress] = useState('');
   const [drawingMode, setDrawingMode] = useState(false);
-  const [drawingPoints, setDrawingPoints] = useState<[number, number][]>([]);
-  const [currentMarkers, setCurrentMarkers] = useState<mapboxgl.Marker[]>([]);
+  const [coordinates, setCoordinates] = useState<Array<[number, number]>>([]);
   const [selectedArea, setSelectedArea] = useState<{
-    coordinates: [number, number][];
-    area_hectares: number;
+    coordinates: Array<[number, number]>;
+    area: number;
   } | null>(null);
   const [carbonCalculation, setCarbonCalculation] = useState<CarbonCalculation | null>(null);
-  const [calculationLoading, setCalculationLoading] = useState(false);
-  const [searchMarker, setSearchMarker] = useState<mapboxgl.Marker | null>(null);
-  
-  // GEE Layer management
-  const addGEELayer = (layerId: string, opacity: number) => {
-    if (!map.current) return;
-    
-    // Mock GEE layer data - in real implementation, this would fetch from GEE
-    const mockLayerData = generateMockGEELayer(layerId, selectedArea?.coordinates);
-    
-    try {
-      // Remove existing layer if it exists
-      if (map.current.getLayer(`gee-${layerId}`)) {
-        map.current.removeLayer(`gee-${layerId}`);
-      }
-      if (map.current.getSource(`gee-${layerId}`)) {
-        map.current.removeSource(`gee-${layerId}`);
-      }
-      
-      // Add new layer source
-      map.current.addSource(`gee-${layerId}`, {
-        type: 'geojson',
-        data: mockLayerData
-      });
-      
-      // Add layer with specific styling based on layer type
-      const layerStyle = getLayerStyle(layerId, opacity);
-      map.current.addLayer({
-        id: `gee-${layerId}`,
-        type: layerStyle.type,
-        source: `gee-${layerId}`,
-        paint: layerStyle.paint
-      });
-      
-      toast(`${layerId.toUpperCase()} layer added to map`);
-    } catch (error) {
-      console.error(`Error adding ${layerId} layer:`, error);
-      toast.error(`Failed to add ${layerId} layer`);
-    }
-  };
-  
-  const removeGEELayer = (layerId: string) => {
-    if (!map.current) return;
-    
-    try {
-      if (map.current.getLayer(`gee-${layerId}`)) {
-        map.current.removeLayer(`gee-${layerId}`);
-      }
-      if (map.current.getSource(`gee-${layerId}`)) {
-        map.current.removeSource(`gee-${layerId}`);
-      }
-      toast(`${layerId.toUpperCase()} layer removed`);
-    } catch (error) {
-      console.error(`Error removing ${layerId} layer:`, error);
-    }
-  };
-  
-  const updateLayerOpacity = (layerId: string, opacity: number) => {
-    if (!map.current || !map.current.getLayer(`gee-${layerId}`)) return;
-    
-    const layerType = map.current.getLayer(`gee-${layerId}`).type;
-    const opacityProperty = layerType === 'fill' ? 'fill-opacity' : 'circle-opacity';
-    
-    map.current.setPaintProperty(`gee-${layerId}`, opacityProperty, opacity / 100);
-  };
-  
-  const generateMockGEELayer = (layerId: string, coordinates?: [number, number][]) => {
-    if (!coordinates || coordinates.length < 3) {
-      // Generate default grid for demo
-      return {
-        type: 'FeatureCollection' as const,
-        features: []
-      };
-    }
-    
-    // Generate mock data points within the selected area
-    const features = [];
-    const bounds = getBounds(coordinates);
-    
-    for (let i = 0; i < 50; i++) {
-      const lng = bounds.minLng + Math.random() * (bounds.maxLng - bounds.minLng);
-      const lat = bounds.minLat + Math.random() * (bounds.maxLat - bounds.minLat);
-      
-      features.push({
-        type: 'Feature' as const,
-        geometry: {
-          type: 'Point' as const,
-          coordinates: [lng, lat]
-        },
-        properties: {
-          value: Math.random(),
-          layerType: layerId
-        }
-      });
-    }
-    
-    return {
-      type: 'FeatureCollection' as const,
-      features
-    };
-  };
-  
-  const getBounds = (coordinates: [number, number][]) => {
-    const lngs = coordinates.map(coord => coord[0]);
-    const lats = coordinates.map(coord => coord[1]);
-    
-    return {
-      minLng: Math.min(...lngs),
-      maxLng: Math.max(...lngs),
-      minLat: Math.min(...lats),
-      maxLat: Math.max(...lats)
-    };
-  };
-  
-  const getLayerStyle = (layerId: string, opacity: number) => {
-    const baseOpacity = opacity / 100;
-    
-    switch (layerId) {
-      case 'ndvi':
-        return {
-          type: 'circle' as const,
-          paint: {
-            'circle-radius': 4,
-            'circle-color': '#22c55e', // Simplified for now
-            'circle-opacity': baseOpacity
-          }
-        };
-      case 'landcover':
-        return {
-          type: 'circle' as const,
-          paint: {
-            'circle-radius': 5,
-            'circle-color': '#3b82f6',
-            'circle-opacity': baseOpacity
-          }
-        };
-      case 'biomass':
-        return {
-          type: 'circle' as const,
-          paint: {
-            'circle-radius': 6,
-            'circle-color': '#f59e0b',
-            'circle-opacity': baseOpacity
-          }
-        };
-      case 'cloudcover':
-        return {
-          type: 'circle' as const,
-          paint: {
-            'circle-radius': 8,
-            'circle-color': '#ffffff',
-            'circle-opacity': baseOpacity * 0.7,
-            'circle-stroke-color': '#d1d5db',
-            'circle-stroke-width': 1
-          }
-        };
-      case 'change':
-        return {
-          type: 'circle' as const,
-          paint: {
-            'circle-radius': 4,
-            'circle-color': '#ef4444',
-            'circle-opacity': baseOpacity
-          }
-        };
-      default:
-        return {
-          type: 'circle' as const,
-          paint: {
-            'circle-radius': 3,
-            'circle-color': '#3b82f6',
-            'circle-opacity': baseOpacity
-          }
-        };
-    }
-  };
-  
-  const handleLayerToggle = (layerId: string, enabled: boolean) => {
-    if (enabled) {
-      addGEELayer(layerId, 70);
-    } else {
-      removeGEELayer(layerId);
-    }
-  };
-  
-  const handleLayerOpacityChange = (layerId: string, opacity: number) => {
-    updateLayerOpacity(layerId, opacity);
-  };
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [mapboxToken, setMapboxToken] = useState<string>('');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [activeLayers, setActiveLayers] = useState<Record<string, { enabled: boolean; opacity: number }>>({});
 
-  // Fetch Mapbox token from Supabase secrets
+  // Initialize map with Mapbox token from Supabase
   useEffect(() => {
     const fetchMapboxToken = async () => {
       try {
         const { data, error } = await supabase.functions.invoke('get-mapbox-token');
-        
-        if (error) {
-          console.error('Error fetching Mapbox token:', error);
-          toast.error("Could not load map configuration");
-          setTokenLoading(false);
-          return;
-        }
-        
+        if (error) throw error;
         if (data?.token) {
           setMapboxToken(data.token);
           initializeMap(data.token);
-        } else {
-          toast.error("Mapbox token not configured");
         }
       } catch (error) {
-        console.error('Error:', error);
-        toast.error("Failed to initialize map");
-      } finally {
-        setTokenLoading(false);
+        console.error('Error fetching Mapbox token:', error);
+        toast.error('Failed to load map. Please check configuration.');
       }
     };
 
     fetchMapboxToken();
   }, []);
 
-  const clearMap = () => {
-    if (!map.current) return;
-    
-    // Remove all markers
-    currentMarkers.forEach(marker => marker.remove());
-    setCurrentMarkers([]);
-    
-    // Remove search marker if it exists
-    if (searchMarker) {
-      searchMarker.remove();
-      setSearchMarker(null);
-    }
-    
-    // Remove polygon layer if it exists
-    if (map.current.getLayer('polygon-fill')) {
-      map.current.removeLayer('polygon-fill');
-    }
-    if (map.current.getLayer('polygon-outline')) {
-      map.current.removeLayer('polygon-outline');
-    }
-    if (map.current.getSource('polygon')) {
-      map.current.removeSource('polygon');
-    }
-    
-    setDrawingPoints([]);
-    setDrawingMode(false);
-    setSelectedArea(null);
-    setCarbonCalculation(null);
-    toast("Map cleared");
-  };
+  const initializeMap = useCallback((token?: string) => {
+    if (!mapContainer.current || map.current) return;
 
-  const addPolygonToMap = (coordinates: [number, number][]) => {
-    if (!map.current || coordinates.length < 3) {
-      console.log('Cannot add polygon: insufficient points or no map', coordinates.length);
+    const mapboxAccessToken = token || mapboxToken;
+    if (!mapboxAccessToken) {
+      console.error('No Mapbox token available');
       return;
     }
 
-    console.log('Adding polygon to map with coordinates:', coordinates);
+    mapboxgl.accessToken = mapboxAccessToken;
 
-    // Close the polygon by adding the first point at the end
-    const closedCoordinates = [...coordinates, coordinates[0]];
-    console.log('Closed coordinates:', closedCoordinates);
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/satellite-v9',
+      center: [-98.5795, 39.8283], // Center of US
+      zoom: 4,
+      projection: 'mercator'
+    });
+
+    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+    map.current.addControl(new mapboxgl.ScaleControl(), 'bottom-left');
+
+    map.current.on('load', () => {
+      setIsMapLoaded(true);
+      addMapEventListeners();
+    });
+
+    map.current.on('error', (e) => {
+      console.error('Map error:', e);
+      toast.error('Map failed to load properly');
+    });
+  }, [mapboxToken]);
+
+  const addMapEventListeners = () => {
+    if (!map.current) return;
+
+    map.current.on('click', handleMapClick);
+  };
+
+  const handleMapClick = (e: mapboxgl.MapMouseEvent) => {
+    if (!drawingMode) return;
+
+    const { lng, lat } = e.lngLat;
+    const newCoordinates = [...coordinates, [lng, lat] as [number, number]];
+    setCoordinates(newCoordinates);
+
+    if (newCoordinates.length >= 3) {
+      addPolygonToMap(newCoordinates);
+    }
+  };
+
+  const addPolygonToMap = (coords: Array<[number, number]>) => {
+    if (!map.current) return;
+
+    // Close the polygon
+    const closedCoords = [...coords, coords[0]];
 
     const polygonGeoJSON = {
       type: 'Feature' as const,
+      properties: {},
       geometry: {
         type: 'Polygon' as const,
-        coordinates: [closedCoordinates]
-      },
-      properties: {}
-    };
-
-    console.log('Polygon GeoJSON:', polygonGeoJSON);
-
-    try {
-      // Remove existing polygon if it exists
-      if (map.current.getLayer('polygon-fill')) {
-        map.current.removeLayer('polygon-fill');
-      }
-      if (map.current.getLayer('polygon-outline')) {
-        map.current.removeLayer('polygon-outline');
-      }
-      if (map.current.getSource('polygon')) {
-        map.current.removeSource('polygon');
-      }
-
-      // Add new polygon source
-      map.current.addSource('polygon', {
-        type: 'geojson',
-        data: polygonGeoJSON
-      });
-
-      console.log('Added polygon source');
-
-      // Add fill layer
-      map.current.addLayer({
-        id: 'polygon-fill',
-        type: 'fill',
-        source: 'polygon',
-        paint: {
-          'fill-color': '#22c55e',
-          'fill-opacity': 0.3
-        }
-      });
-
-      console.log('Added polygon fill layer');
-
-      // Add outline layer
-      map.current.addLayer({
-        id: 'polygon-outline',
-        type: 'line',
-        source: 'polygon',
-        paint: {
-          'line-color': '#22c55e',
-          'line-width': 3
-        }
-      });
-
-      console.log('Added polygon outline layer');
-      toast('Polygon displayed on map!');
-    } catch (error) {
-      console.error('Error adding polygon to map:', error);
-      toast.error('Failed to display polygon on map');
-    }
-  };
-
-  const calculatePolygonArea = (coordinates: [number, number][]) => {
-    // Simple area calculation using shoelace formula (approximation for small areas)
-    if (coordinates.length < 3) return 0;
-    
-    let area = 0;
-    const n = coordinates.length;
-    
-    for (let i = 0; i < n; i++) {
-      const j = (i + 1) % n;
-      area += coordinates[i][0] * coordinates[j][1];
-      area -= coordinates[j][0] * coordinates[i][1];
-    }
-    
-    area = Math.abs(area) / 2;
-    
-    // Convert from degree-squared to hectares (very rough approximation)
-    // 1 degree ≈ 111 km at equator, so 1 sq degree ≈ 12321 sq km
-    const hectares = area * 12321 * 100; // Convert to hectares
-    return hectares;
-  };
-
-  const initializeMap = (token?: string) => {
-    const tokenToUse = token || mapboxToken;
-    if (!mapContainer.current || !tokenToUse) return;
-
-    try {
-      mapboxgl.accessToken = tokenToUse;
-      
-      map.current = new mapboxgl.Map({
-        container: mapContainer.current,
-        style: 'mapbox://styles/mapbox/satellite-v9',
-        zoom: 10,
-        center: [-122.4194, 37.7749], // San Francisco default
-      });
-
-      // Add navigation controls
-      map.current.addControl(
-        new mapboxgl.NavigationControl(),
-        'top-right'
-      );
-
-      // Map click handler will be added in separate useEffect
-      toast("Map initialized! Click to select properties or enable Draw Boundary mode.");
-    } catch (error) {
-      console.error('Map initialization error:', error);
-      toast.error("Failed to initialize map. Please check your Mapbox token.");
-    }
-  };
-
-  // Add click handler in separate useEffect to ensure it uses current state
-  useEffect(() => {
-    if (!map.current) return;
-
-    const handleMapClick = async (e: mapboxgl.MapMouseEvent) => {
-      console.log('Map clicked, drawingMode:', drawingMode, 'current points:', drawingPoints.length);
-      
-      if (drawingMode) {
-        // Clear search marker when starting to draw
-        if (searchMarker) {
-          searchMarker.remove();
-          setSearchMarker(null);
-        }
-        
-        // Add point to drawing
-        const newPoints = [...drawingPoints, [e.lngLat.lng, e.lngLat.lat] as [number, number]];
-        console.log('Adding new point, total points:', newPoints.length);
-        setDrawingPoints(newPoints);
-        
-        // Add visual marker for the point
-        const marker = new mapboxgl.Marker({ 
-          color: '#22c55e',
-          scale: 1.5
-        })
-          .setLngLat(e.lngLat)
-          .addTo(map.current!);
-        
-        setCurrentMarkers(prev => [...prev, marker]);
-        
-        // If we have 3+ points, draw the polygon
-        if (newPoints.length >= 3) {
-          console.log('Drawing polygon with', newPoints.length, 'points');
-          addPolygonToMap(newPoints);
-        }
-        
-        toast(`Point ${newPoints.length} added. ${newPoints.length >= 3 ? 'Polygon created!' : `Need ${3 - newPoints.length} more points.`}`);
+        coordinates: [closedCoords]
       }
     };
 
-    // Remove existing listener and add new one
-    map.current.off('click', handleMapClick);
-    map.current.on('click', handleMapClick);
-
-    return () => {
-      if (map.current) {
-        map.current.off('click', handleMapClick);
-      }
-    };
-  }, [drawingMode, drawingPoints, currentMarkers, searchMarker]);
-
-  const finishDrawing = async () => {
-    if (drawingPoints.length < 3) {
-      toast.error("Need at least 3 points to create an area");
-      return;
+    // Remove existing polygon layers
+    if (map.current.getLayer('selected-area-fill')) {
+      map.current.removeLayer('selected-area-fill');
+    }
+    if (map.current.getLayer('selected-area-outline')) {
+      map.current.removeLayer('selected-area-outline');
+    }
+    if (map.current.getSource('selected-area')) {
+      map.current.removeSource('selected-area');
     }
 
-    const area = calculatePolygonArea(drawingPoints);
-    
-    // Set the selected area
-    setSelectedArea({
-      coordinates: drawingPoints,
-      area_hectares: area,
+    // Add new polygon
+    map.current.addSource('selected-area', {
+      type: 'geojson',
+      data: polygonGeoJSON
     });
 
-    // Trigger carbon calculation
-    await calculateCarbonForArea(drawingPoints, area);
+    map.current.addLayer({
+      id: 'selected-area-fill',
+      type: 'fill',
+      source: 'selected-area',
+      paint: {
+        'fill-color': '#3b82f6',
+        'fill-opacity': 0.3
+      }
+    });
 
-    toast(`Area selected! ${area.toFixed(2)} hectares`);
+    map.current.addLayer({
+      id: 'selected-area-outline',
+      type: 'line',
+      source: 'selected-area',
+      paint: {
+        'line-color': '#2563eb',
+        'line-width': 2
+      }
+    });
+
+    // Calculate area
+    const area = calculatePolygonArea(coords);
+    setSelectedArea({ coordinates: coords, area });
     setDrawingMode(false);
+    setCoordinates([]);
   };
 
-  const calculateCarbonForArea = async (coordinates: [number, number][], areaHectares: number) => {
-    setCalculationLoading(true);
+  const calculatePolygonArea = (coords: Array<[number, number]>): number => {
+    // Simple area calculation using shoelace formula (approximate)
+    let area = 0;
+    for (let i = 0; i < coords.length; i++) {
+      const j = (i + 1) % coords.length;
+      area += coords[i][0] * coords[j][1];
+      area -= coords[j][0] * coords[i][1];
+    }
+    return Math.abs(area) / 2 * 111000 * 111000 / 10000; // Convert to hectares (approximate)
+  };
+
+  const startDrawing = () => {
+    setDrawingMode(true);
+    setCoordinates([]);
+    clearMap();
+    toast.info('Click on the map to draw a polygon. Need at least 3 points.');
+  };
+
+  const finishDrawing = () => {
+    if (coordinates.length >= 3) {
+      addPolygonToMap(coordinates);
+      calculateCarbonForArea();
+    } else {
+      toast.error('Need at least 3 points to create a polygon');
+    }
+  };
+
+  const clearMap = () => {
+    if (!map.current) return;
+
+    // Clear drawing state
+    setDrawingMode(false);
+    setCoordinates([]);
+    setSelectedArea(null);
+    setCarbonCalculation(null);
+
+    // Remove map layers
+    const layersToRemove = ['selected-area-fill', 'selected-area-outline'];
+    layersToRemove.forEach(layerId => {
+      if (map.current?.getLayer(layerId)) {
+        map.current.removeLayer(layerId);
+      }
+    });
+
+    if (map.current.getSource('selected-area')) {
+      map.current.removeSource('selected-area');
+    }
+
+    // Clear GEE layers
+    Object.keys(activeLayers).forEach(layerId => {
+      removeGEELayer(layerId);
+    });
+    setActiveLayers({});
+  };
+
+  const calculateCarbonForArea = async () => {
+    if (!selectedArea) return;
+
+    setIsCalculating(true);
     try {
-      // Call carbon calculation edge function with raw geometry
       const { data, error } = await supabase.functions.invoke('calculate-carbon-gee', {
         body: {
           geometry: {
             type: 'Polygon',
-            coordinates: [[...coordinates, coordinates[0]]] // Close the polygon
+            coordinates: [selectedArea.coordinates]
           },
-          areaHectares,
+          areaHectares: selectedArea.area,
         },
       });
 
       if (error) throw error;
 
-      if (data.success && data.calculation) {
-        setCarbonCalculation(data.calculation);
+      if (data.success) {
+        setCarbonCalculation(data.carbonData);
         toast.success('Carbon calculation completed!');
-        return data.calculation;
       } else {
         throw new Error('Calculation failed');
       }
     } catch (error) {
       console.error('Error calculating carbon:', error);
       toast.error('Failed to calculate carbon storage');
-      return null;
     } finally {
-      setCalculationLoading(false);
+      setIsCalculating(false);
     }
   };
 
   const handleAddressSearch = async () => {
-    if (!address.trim()) {
-      toast.error("Please enter an address");
-      return;
+    if (!searchAddress.trim()) return;
+
+    // Mock geocoding - center on a default location
+    // In real implementation, use Mapbox Geocoding API
+    const mockCoords: [number, number] = [-98.5795, 39.8283];
+    
+    if (map.current) {
+      map.current.flyTo({
+        center: mockCoords,
+        zoom: 10,
+        duration: 2000
+      });
     }
     
+    toast.success(`Searching for: ${searchAddress}`);
+  };
+
+  const handleLayerToggle = (layerId: string, enabled: boolean) => {
+    if (enabled) {
+      addGEELayer(layerId);
+    } else {
+      removeGEELayer(layerId);
+    }
+
+    setActiveLayers(prev => ({
+      ...prev,
+      [layerId]: { ...prev[layerId], enabled }
+    }));
+  };
+
+  const handleLayerOpacityChange = (layerId: string, opacity: number) => {
+    if (map.current && map.current.getLayer(layerId)) {
+      const layerType = map.current.getLayer(layerId)?.type;
+      if (layerType === 'raster') {
+        map.current.setPaintProperty(layerId, 'raster-opacity', opacity / 100);
+      }
+    }
+
+    setActiveLayers(prev => ({
+      ...prev,
+      [layerId]: { ...prev[layerId], opacity }
+    }));
+  };
+
+  const addGEELayer = async (layerId: string) => {
+    if (!map.current || !isMapLoaded) return;
+
+    try {
+      // Generate live GEE tile URL
+      const { data, error } = await supabase.functions.invoke('calculate-carbon-gee', {
+        body: {
+          action: 'getTileUrl',
+          layerId: layerId,
+          bbox: map.current.getBounds().toArray().flat()
+        },
+      });
+
+      if (error) throw error;
+
+      const tileUrl = data.tileUrl;
+
+      // Remove existing layer if it exists
+      if (map.current.getLayer(layerId)) {
+        map.current.removeLayer(layerId);
+      }
+      if (map.current.getSource(layerId)) {
+        map.current.removeSource(layerId);
+      }
+
+      // Add new GEE tile layer
+      map.current.addSource(layerId, {
+        type: 'raster',
+        tiles: [tileUrl],
+        tileSize: 256
+      });
+
+      map.current.addLayer({
+        id: layerId,
+        type: 'raster',
+        source: layerId,
+        paint: {
+          'raster-opacity': (activeLayers[layerId]?.opacity || 80) / 100
+        }
+      });
+
+      toast.success(`${layerId} layer added to map`);
+    } catch (error) {
+      console.error(`Error adding ${layerId} layer:`, error);
+      toast.error(`Failed to load ${layerId} layer`);
+    }
+  };
+
+  const removeGEELayer = (layerId: string) => {
     if (!map.current) return;
-    
-    // Mock geocoding for demo - in real app, use Mapbox Geocoding API
-    const mockCoordinates: [number, number] = [-122.4194 + (Math.random() - 0.5) * 0.1, 37.7749 + (Math.random() - 0.5) * 0.1];
-    
-    // Clear previous search marker
-    if (searchMarker) {
-      searchMarker.remove();
+
+    if (map.current.getLayer(layerId)) {
+      map.current.removeLayer(layerId);
     }
-    
-    // Add search marker
-    const marker = new mapboxgl.Marker({ color: '#3b82f6' })
-      .setLngLat(mockCoordinates)
-      .addTo(map.current);
-    
-    setSearchMarker(marker);
-    
-    // Center map on searched location
-    map.current.flyTo({
-      center: mockCoordinates,
-      zoom: 15,
-      duration: 2000
-    });
-    
-    toast(`Found location: ${address}. Now draw a polygon to select your area.`);
+    if (map.current.getSource(layerId)) {
+      map.current.removeSource(layerId);
+    }
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-12">
-      <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold text-foreground mb-4">Calculate Carbon Storage</h2>
-        <p className="text-muted-foreground max-w-2xl mx-auto">
-          Search for a location and draw a polygon to calculate the carbon storage for that area.
-        </p>
+    <div className="flex h-screen bg-background">
+      {/* Left Sidebar */}
+      <div className={`${sidebarCollapsed ? 'w-12' : 'w-80'} transition-all duration-300 bg-card border-r border-border flex flex-col`}>
+        {/* Sidebar Header */}
+        <div className="p-4 border-b border-border flex items-center justify-between">
+          {!sidebarCollapsed && (
+            <h2 className="text-lg font-semibold text-foreground">Data Layers</h2>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className="p-2"
+          >
+            {sidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          </Button>
+        </div>
+
+        {/* Sidebar Content */}
+        {!sidebarCollapsed && (
+          <div className="flex-1 overflow-y-auto p-4">
+            <GEELayerToggle
+              onLayerToggle={handleLayerToggle}
+              onLayerOpacityChange={handleLayerOpacityChange}
+            />
+          </div>
+        )}
       </div>
 
-      {tokenLoading && (
-        <Card className="mb-6 border-primary/20 bg-primary/5">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-center">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mr-3"></div>
-              <p className="text-muted-foreground">Loading map configuration...</p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {!tokenLoading && !map.current && (
-        <Card className="mb-6 border-destructive/20 bg-destructive/5">
-          <CardHeader>
-            <CardTitle className="text-destructive">Map Configuration Error</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Could not load the map. Please check if the Mapbox token is properly configured in the project settings.
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Area Selection Controls */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="text-lg">Area Selection</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col sm:flex-row gap-4">
-            {/* Address Search */}
-            <div className="flex-1 flex gap-2">
+      {/* Main Map Area */}
+      <div className="flex-1 flex flex-col">
+        {/* Map Controls Header */}
+        <div className="bg-card border-b border-border p-4">
+          <div className="flex items-center gap-4">
+            {/* Search */}
+            <div className="flex-1 flex items-center gap-2">
+              <Search className="w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="Enter address, city, or location..."
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Search for an address or location..."
+                value={searchAddress}
+                onChange={(e) => setSearchAddress(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleAddressSearch()}
                 className="flex-1"
               />
-              <Button size="sm" onClick={handleAddressSearch}>
-                <Search className="w-4 h-4" />
+              <Button onClick={handleAddressSearch} size="sm">
+                Search
               </Button>
             </div>
 
-            {/* Clear Map */}
-            <Button 
-              variant="outline" 
-              onClick={clearMap}
-            >
-              <Square className="w-4 h-4 mr-2" />
-              Clear Map
-            </Button>
+            {/* Drawing Controls */}
+            <div className="flex items-center gap-2">
+              <Button
+                variant={drawingMode ? "default" : "outline"}
+                onClick={drawingMode ? finishDrawing : startDrawing}
+                disabled={drawingMode && coordinates.length < 3}
+                size="sm"
+              >
+                <Square className="w-4 h-4 mr-2" />
+                {drawingMode ? 'Finish Drawing' : 'Draw Area'}
+              </Button>
+              <Button variant="outline" onClick={clearMap} size="sm">
+                <RotateCcw className="w-4 h-4 mr-2" />
+                Clear
+              </Button>
+            </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      <div className="grid lg:grid-cols-4 gap-6">
-        {/* Map */}
-        <div className="lg:col-span-3 order-1">
-          <Card className="h-[600px] relative">
-            <CardContent className="p-0 h-full">
-              <div 
-                ref={mapContainer} 
-                className="w-full h-full rounded-lg"
-                style={{ minHeight: '600px' }}
-              />
-              
-              {/* Floating Draw Toggle */}
-              <div className="absolute top-4 left-4 z-10">
-                <Button
-                  size="sm"
-                  variant={drawingMode ? "default" : "outline"}
-                  className="shadow-lg bg-background/90 backdrop-blur-sm border"
-                  onClick={() => setDrawingMode(!drawingMode)}
-                >
-                  <Edit3 className="w-4 h-4 mr-2" />
-                  {drawingMode ? 'Stop Drawing' : 'Draw Area'}
-                </Button>
+        {/* Map Container */}
+        <div className="flex-1 relative">
+          <div ref={mapContainer} className="absolute inset-0" />
+          
+          {!isMapLoaded && (
+            <div className="absolute inset-0 flex items-center justify-center bg-background/80">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+                <p className="mt-4 text-muted-foreground">Loading map...</p>
+              </div>
+            </div>
+          )}
+
+          {drawingMode && (
+            <div className="absolute top-4 left-4 bg-card p-3 rounded-lg shadow-lg border border-border">
+              <p className="text-sm text-foreground">
+                Drawing mode active. Points: {coordinates.length}
+                {coordinates.length >= 3 ? ' (Ready to finish)' : ' (Need at least 3)'}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Right Panel - Selected Area Info */}
+      {selectedArea && (
+        <div className="w-96 bg-card border-l border-border p-4 overflow-y-auto">
+          <Card>
+            <CardHeader>
+              <CardTitle>Selected Area</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Area</p>
+                <p className="text-lg font-semibold">{selectedArea.area.toFixed(2)} hectares</p>
               </div>
 
-              {/* Drawing Instructions */}
-              {drawingMode && (
-                <div className="absolute top-16 left-4 z-10">
-                  <Card className="bg-background/90 backdrop-blur-sm border shadow-lg">
-                    <CardContent className="p-3">
-                      <div className="text-xs text-muted-foreground">
-                        Click map to add points. Need 3+ points for polygon.
-                        {drawingPoints.length > 0 && (
-                          <div className="mt-1">
-                            Points: {drawingPoints.length}
-                            {drawingPoints.length >= 3 && (
-                              <Button 
-                                size="sm" 
-                                className="ml-2 h-6"
-                                onClick={finishDrawing}
-                              >
-                                Calculate Carbon
-                              </Button>
-                            )}
-                          </div>
-                        )}
+              {isCalculating ? (
+                <div className="text-center py-4">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                  <p className="mt-2 text-sm text-muted-foreground">Calculating carbon storage...</p>
+                </div>
+              ) : carbonCalculation ? (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <h3 className="text-lg font-semibold">Carbon Storage Results</h3>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Total CO₂e:</span>
+                        <span className="font-semibold ml-2">{carbonCalculation.total_co2e.toFixed(1)} tonnes</span>
                       </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
-
-              {/* GEE Layer Toggle */}
-              <GEELayerToggle 
-                onLayerToggle={handleLayerToggle}
-                onLayerOpacityChange={handleLayerOpacityChange}
-              />
-
-              {!map.current && (
-                <div className="absolute inset-0 flex items-center justify-center bg-muted/50 rounded-lg">
-                  <div className="text-center">
-                    <MapPin className="w-12 h-12 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-muted-foreground">Map will appear here after token setup</p>
+                      <div>
+                        <span className="text-muted-foreground">Biomass:</span>
+                        <span className="font-semibold ml-2">{carbonCalculation.above_ground_biomass.toFixed(1)} tonnes</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Soil Carbon:</span>
+                        <span className="font-semibold ml-2">{carbonCalculation.soil_organic_carbon.toFixed(1)} tonnes</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Method:</span>
+                        <span className="font-semibold ml-2">{carbonCalculation.calculation_method}</span>
+                      </div>
+                    </div>
                   </div>
+                  {carbonCalculation.data_sources && (
+                    <GEEDataVisualization carbonCalculation={carbonCalculation} />
+                  )}
                 </div>
+              ) : (
+                <Button onClick={calculateCarbonForArea} className="w-full">
+                  Calculate Carbon Storage
+                </Button>
               )}
             </CardContent>
           </Card>
         </div>
-
-        {/* Selected Area Info */}
-        <div className="lg:col-span-1 order-2">
-          {selectedArea && (
-            <Card className="border-primary/20 bg-primary/5">
-              <CardHeader>
-                <CardTitle className="text-lg text-primary">Selected Area</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span>Area:</span>
-                    <span className="font-medium">{selectedArea.area_hectares.toFixed(2)} ha</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Resolution:</span>
-                    <span className="font-medium">10m pixels</span>
-                  </div>
-                  {carbonCalculation && (
-                    <div className="border-t pt-2 mt-2">
-                      <div className="flex justify-between items-center">
-                        <span>Carbon Storage:</span>
-                        <div className="flex items-center gap-1">
-                          <span className="font-medium text-primary">{carbonCalculation.total_co2e.toFixed(1)} t CO₂e</span>
-                          <CarbonMethodologyInfo />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  {!carbonCalculation && (
-                    <Button 
-                      className="w-full mt-4" 
-                      size="sm"
-                      onClick={() => calculateCarbonForArea(selectedArea.coordinates, selectedArea.area_hectares)}
-                      disabled={calculationLoading}
-                    >
-                      {calculationLoading ? 'Calculating...' : 'Calculate Carbon Storage'}
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </div>
+      )}
     </div>
   );
 };

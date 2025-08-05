@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from './useAuth';
 import { toast } from 'sonner';
 
 interface Property {
@@ -26,18 +25,11 @@ interface CarbonCalculation {
 }
 
 export const useProperty = () => {
-  const { user } = useAuth();
   const [properties, setProperties] = useState<Property[]>([]);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
   const [carbonCalculation, setCarbonCalculation] = useState<CarbonCalculation | null>(null);
   const [loading, setLoading] = useState(false);
   const [calculationLoading, setCalculationLoading] = useState(false);
-
-  useEffect(() => {
-    if (user) {
-      fetchProperties();
-    }
-  }, [user]);
 
   const fetchProperties = async () => {
     try {
@@ -60,7 +52,6 @@ export const useProperty = () => {
     geometry: any;
     area_hectares: number;
   }) => {
-    if (!user) return null;
 
     setLoading(true);
     try {
@@ -68,7 +59,6 @@ export const useProperty = () => {
         .from('properties')
         .insert([
           {
-            user_id: user.id,
             ...propertyData,
           }
         ])
