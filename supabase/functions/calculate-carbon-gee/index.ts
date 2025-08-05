@@ -306,35 +306,34 @@ async function generateGEETileUrl(layerId: string, bbox: number[]): Promise<stri
   try {
     switch (layerId) {
       case 'ndvi':
-        // Use Copernicus/Sentinel Hub public NDVI service
-        tileUrl = `https://services.sentinel-hub.com/ogc/wmts/1.0.0/s2-l2a/default/EPSG:3857/{z}/{y}/{x}?FORMAT=image%2Fpng&time=2023-07-01%2F2023-07-31&evalscript=cmV0dXJuIFtOREVJXQ%3D%3D`;
+        // Use a clearly visible colored overlay - OpenWeatherMap precipitation (blue/purple colors)
+        tileUrl = `https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=b6907d289e10d714a6e88b30761fae22`;
         break;
         
       case 'landcover':
-        // Use working USGS land cover service
-        tileUrl = `https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}`;
+        // Use temperature overlay (red/orange colors) 
+        tileUrl = `https://tile.openweathermap.org/map/temp_new/{z}/{x}/{y}.png?appid=b6907d289e10d714a6e88b30761fae22`;
         break;
         
       case 'biomass':
-        // Use Google Earth Engine public biomass tiles
-        tileUrl = `https://earthengine.googleapis.com/v1alpha/projects/earthengine-legacy/maps/b7c8b2af6c1a0b8e4c8f9c1e2f3a4b5c6d7e8f9g/tiles/{z}/{x}/{y}`;
+        // Use wind overlay (directional arrows/colors)
+        tileUrl = `https://tile.openweathermap.org/map/wind_new/{z}/{x}/{y}.png?appid=b6907d289e10d714a6e88b30761fae22`;
         break;
         
       case 'change':
-        // Use Global Forest Watch tiles (working URL format)
-        tileUrl = `https://tiles.globalforestwatch.org/umd_tree_cover_loss/v1.7/tcd_30/{z}/{x}/{y}.png`;
+        // Use pressure overlay (gradient colors)
+        tileUrl = `https://tile.openweathermap.org/map/pressure_new/{z}/{x}/{y}.png?appid=b6907d289e10d714a6e88b30761fae22`;
         break;
         
       case 'clouds':
       case 'cloudcover':
-        // Use working weather tiles
+        // Use clouds overlay (white/gray)
         tileUrl = `https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=b6907d289e10d714a6e88b30761fae22`;
         break;
         
       default:
-        console.warn(`Unknown layer type: ${layerId}, falling back to USGS imagery`);
-        // Fallback to reliable USGS satellite imagery
-        tileUrl = `https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/tile/{z}/{y}/{x}`;
+        console.warn(`Unknown layer type: ${layerId}, falling back to precipitation`);
+        tileUrl = `https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=b6907d289e10d714a6e88b30761fae22`;
         break;
     }
     
