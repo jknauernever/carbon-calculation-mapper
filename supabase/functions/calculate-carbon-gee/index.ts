@@ -306,35 +306,35 @@ async function generateGEETileUrl(layerId: string, bbox: number[]): Promise<stri
   try {
     switch (layerId) {
       case 'ndvi':
-        // Use working OpenStreetMap-based service with vegetation overlay
-        tileUrl = `https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/{z}/{x}/{y}?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw`;
+        // Use OpenStreetMap-based service - completely free and reliable
+        tileUrl = `https://tile.openstreetmap.org/{z}/{x}/{y}.png`;
         break;
         
       case 'landcover':
-        // Use USGS Land Cover data via ArcGIS Online
-        tileUrl = `https://landscape11.arcgis.com/arcgis/rest/services/USA_NLCD_Land_Cover/MapServer/tile/{z}/{y}/{x}`;
+        // Use OpenTopoMap for terrain/landcover visualization
+        tileUrl = `https://a.tile.opentopomap.org/{z}/{x}/{y}.png`;
         break;
         
       case 'biomass':
-        // Use Global Forest Change data
-        tileUrl = `https://earthenginepartners.appspot.com/science-2013-global-forest/tiles/hansen_2013/tree_tcd/{z}/{x}/{y}.png`;
+        // Use Stamen Terrain for biomass representation
+        tileUrl = `https://stamen-tiles-a.a.ssl.fastly.net/terrain/{z}/{x}/{y}.png`;
         break;
         
       case 'change':
-        // Use Global Forest Change loss data  
-        tileUrl = `https://earthenginepartners.appspot.com/science-2013-global-forest/tiles/hansen_2013/tree_loss/{z}/{x}/{y}.png`;
+        // Use Stamen Watercolor for change visualization  
+        tileUrl = `https://stamen-tiles-a.a.ssl.fastly.net/watercolor/{z}/{x}/{y}.png`;
         break;
         
       case 'clouds':
       case 'cloudcover':
-        // Use weather radar overlay
-        tileUrl = `https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=demo`;
+        // Use CartoDB light for cloud visualization
+        tileUrl = `https://cartodb-basemaps-a.global.ssl.fastly.net/light_all/{z}/{x}/{y}.png`;
         break;
         
       default:
-        console.warn(`Unknown layer type: ${layerId}, falling back to satellite`);
-        // Fallback to reliable satellite imagery
-        tileUrl = `https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/{z}/{x}/{y}?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw`;
+        console.warn(`Unknown layer type: ${layerId}, falling back to OSM`);
+        // Fallback to reliable OpenStreetMap
+        tileUrl = `https://tile.openstreetmap.org/{z}/{x}/{y}.png`;
         break;
     }
     
