@@ -7,7 +7,6 @@ interface PropertyGeometry {
 }
 
 interface CarbonCalculationRequest {
-  propertyId: string;
   geometry: PropertyGeometry;
   areaHectares: number;
 }
@@ -42,46 +41,35 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const { propertyId, geometry, areaHectares }: CarbonCalculationRequest = await req.json()
+    const { geometry, areaHectares }: CarbonCalculationRequest = await req.json()
 
-    console.log(`Starting GEE carbon calculation for property ${propertyId}, area: ${areaHectares} hectares`)
+    console.log(`Starting GEE carbon calculation for area: ${areaHectares} hectares`)
 
     // Calculate carbon using Google Earth Engine
     const carbonData = await calculateCarbonWithGEE(geometry, areaHectares)
 
-    // Store enhanced calculation results
-    const { data: calculation, error } = await supabaseClient
-      .from('carbon_calculations')
-      .insert([
-        {
-          property_id: propertyId,
-          total_co2e: carbonData.totalCO2e,
-          above_ground_biomass: carbonData.aboveGroundBiomass,
-          below_ground_biomass: carbonData.belowGroundBiomass,
-          soil_organic_carbon: carbonData.soilOrganicCarbon,
-          calculation_method: 'gee-ndvi-landcover',
-          data_sources: {
-            ndvi: `Sentinel-2 (10m) - Mean: ${carbonData.ndviMean.toFixed(3)}, Std: ${carbonData.ndviStd.toFixed(3)}`,
-            landCover: `Copernicus Global Land Cover (10m)`,
-            soilCarbon: 'SoilGrids (interpolated to 10m)',
-            satelliteImages: carbonData.processingMetadata.satelliteImages,
-            dateRange: carbonData.processingMetadata.dateRange,
-            cloudCoverage: `${carbonData.cloudCoverage.toFixed(1)}%`,
-            dataQuality: carbonData.dataQuality,
-            landCoverBreakdown: carbonData.landCoverDistribution,
-            uncertaintyRange: carbonData.processingMetadata.uncertaintyRange,
-            timestamp: new Date().toISOString()
-          }
-        }
-      ])
-      .select()
-      .single()
-
-    if (error) {
-      throw error
+    // Return calculation directly (no database storage for simplified workflow)
+    const calculation = {
+      total_co2e: carbonData.totalCO2e,
+      above_ground_biomass: carbonData.aboveGroundBiomass,
+      below_ground_biomass: carbonData.belowGroundBiomass,
+      soil_organic_carbon: carbonData.soilOrganicCarbon,
+      calculation_method: 'gee-ndvi-landcover',
+      data_sources: {
+        ndvi: `Sentinel-2 (10m) - Mean: ${carbonData.ndviMean.toFixed(3)}, Std: ${carbonData.ndviStd.toFixed(3)}`,
+        landCover: `Copernicus Global Land Cover (10m)`,
+        soilCarbon: 'SoilGrids (interpolated to 10m)',
+        satelliteImages: carbonData.processingMetadata.satelliteImages,
+        dateRange: carbonData.processingMetadata.dateRange,
+        cloudCoverage: `${carbonData.cloudCoverage.toFixed(1)}%`,
+        dataQuality: carbonData.dataQuality,
+        landCoverBreakdown: carbonData.landCoverDistribution,
+        uncertaintyRange: carbonData.processingMetadata.uncertaintyRange,
+        timestamp: new Date().toISOString()
+      }
     }
 
-    console.log(`GEE carbon calculation completed successfully for property ${propertyId}`)
+    console.log(`GEE carbon calculation completed successfully for area`)
 
     return new Response(
       JSON.stringify({ 

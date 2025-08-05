@@ -4,11 +4,19 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, MapPin, Upload, Square } from "lucide-react";
+import { Search, Square, MapPin } from "lucide-react";
 import { toast } from "sonner";
-import { useProperty } from "@/hooks/useProperty";
 import { CarbonMethodologyInfo } from "./CarbonMethodologyInfo";
 import { supabase } from "@/integrations/supabase/client";
+
+interface CarbonCalculation {
+  total_co2e: number;
+  above_ground_biomass: number;
+  below_ground_biomass: number;
+  soil_organic_carbon: number;
+  calculation_method: string;
+  data_sources?: any;
+}
 
 export const MapInterface = () => {
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -19,8 +27,13 @@ export const MapInterface = () => {
   const [drawingMode, setDrawingMode] = useState(false);
   const [drawingPoints, setDrawingPoints] = useState<[number, number][]>([]);
   const [currentMarkers, setCurrentMarkers] = useState<mapboxgl.Marker[]>([]);
-  
-  const { selectedProperty, createProperty, calculateCarbon, selectProperty, carbonCalculation, loading, calculationLoading } = useProperty();
+  const [selectedArea, setSelectedArea] = useState<{
+    coordinates: [number, number][];
+    area_hectares: number;
+  } | null>(null);
+  const [carbonCalculation, setCarbonCalculation] = useState<CarbonCalculation | null>(null);
+  const [calculationLoading, setCalculationLoading] = useState(false);
+  const [searchMarker, setSearchMarker] = useState<mapboxgl.Marker | null>(null);
 
   // Fetch Mapbox token from Supabase secrets
   useEffect(() => {
@@ -59,6 +72,12 @@ export const MapInterface = () => {
     currentMarkers.forEach(marker => marker.remove());
     setCurrentMarkers([]);
     
+    // Remove search marker if it exists
+    if (searchMarker) {
+      searchMarker.remove();
+      setSearchMarker(null);
+    }
+    
     // Remove polygon layer if it exists
     if (map.current.getLayer('polygon-fill')) {
       map.current.removeLayer('polygon-fill');
@@ -72,6 +91,8 @@ export const MapInterface = () => {
     
     setDrawingPoints([]);
     setDrawingMode(false);
+    setSelectedArea(null);
+    setCarbonCalculation(null);
     toast("Map cleared");
   };
 
@@ -207,6 +228,12 @@ export const MapInterface = () => {
       console.log('Map clicked, drawingMode:', drawingMode, 'current points:', drawingPoints.length);
       
       if (drawingMode) {
+        // Clear search marker when starting to draw
+        if (searchMarker) {
+          searchMarker.remove();
+          setSearchMarker(null);
+        }
+        
         // Add point to drawing
         const newPoints = [...drawingPoints, [e.lngLat.lng, e.lngLat.lat] as [number, number]];
         console.log('Adding new point, total points:', newPoints.length);
@@ -229,29 +256,6 @@ export const MapInterface = () => {
         }
         
         toast(`Point ${newPoints.length} added. ${newPoints.length >= 3 ? 'Polygon created!' : `Need ${3 - newPoints.length} more points.`}`);
-      } else {
-        // Create a mock selected area for demo
-        const mockArea = Math.random() * 5 + 1; // 1-6 hectares
-        
-        // Create GeoJSON point geometry
-        const geometry = {
-          type: 'Point',
-          coordinates: [e.lngLat.lng, e.lngLat.lat]
-        };
-        
-        // Create property in database
-        await createProperty({
-          name: `Property at ${e.lngLat.lat.toFixed(4)}, ${e.lngLat.lng.toFixed(4)}`,
-          geometry,
-          area_hectares: mockArea,
-        });
-        
-        const marker = new mapboxgl.Marker({ color: '#22c55e' })
-          .setLngLat(e.lngLat)
-          .addTo(map.current!);
-          
-        setCurrentMarkers(prev => [...prev, marker]);
-        toast(`Property saved! Area: ${mockArea.toFixed(2)} hectares`);
       }
     };
 
@@ -264,36 +268,59 @@ export const MapInterface = () => {
         map.current.off('click', handleMapClick);
       }
     };
-  }, [drawingMode, drawingPoints, createProperty, currentMarkers]);
+  }, [drawingMode, drawingPoints, currentMarkers, searchMarker]);
 
   const finishDrawing = async () => {
     if (drawingPoints.length < 3) {
-      toast.error("Need at least 3 points to create a property");
+      toast.error("Need at least 3 points to create an area");
       return;
     }
 
     const area = calculatePolygonArea(drawingPoints);
-    const centerLat = drawingPoints.reduce((sum, p) => sum + p[1], 0) / drawingPoints.length;
-    const centerLng = drawingPoints.reduce((sum, p) => sum + p[0], 0) / drawingPoints.length;
-
-    // Create property from drawn polygon
-    const newProperty = await createProperty({
-      name: `Drawn Property at ${centerLat.toFixed(4)}, ${centerLng.toFixed(4)}`,
-      geometry: {
-        type: 'Polygon',
-        coordinates: [[...drawingPoints, drawingPoints[0]]] // Close the polygon
-      },
+    
+    // Set the selected area
+    setSelectedArea({
+      coordinates: drawingPoints,
       area_hectares: area,
     });
 
-    // Select the newly created property and calculate carbon
-    if (newProperty) {
-      selectProperty(newProperty);
-      await calculateCarbon(newProperty);
-    }
+    // Trigger carbon calculation
+    await calculateCarbonForArea(drawingPoints, area);
 
-    toast(`Property created! Area: ${area.toFixed(2)} hectares`);
+    toast(`Area selected! ${area.toFixed(2)} hectares`);
     setDrawingMode(false);
+  };
+
+  const calculateCarbonForArea = async (coordinates: [number, number][], areaHectares: number) => {
+    setCalculationLoading(true);
+    try {
+      // Call carbon calculation edge function with raw geometry
+      const { data, error } = await supabase.functions.invoke('calculate-carbon-gee', {
+        body: {
+          geometry: {
+            type: 'Polygon',
+            coordinates: [[...coordinates, coordinates[0]]] // Close the polygon
+          },
+          areaHectares,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data.success && data.calculation) {
+        setCarbonCalculation(data.calculation);
+        toast.success('Carbon calculation completed!');
+        return data.calculation;
+      } else {
+        throw new Error('Calculation failed');
+      }
+    } catch (error) {
+      console.error('Error calculating carbon:', error);
+      toast.error('Failed to calculate carbon storage');
+      return null;
+    } finally {
+      setCalculationLoading(false);
+    }
   };
 
   const handleAddressSearch = async () => {
@@ -301,29 +328,40 @@ export const MapInterface = () => {
       toast.error("Please enter an address");
       return;
     }
-    // Mock geocoding for demo
-    const mockArea = Math.random() * 10 + 2;
     
-    // Create property from address search
-    await createProperty({
-      name: address,
-      address: address,
-      geometry: {
-        type: 'Point',
-        coordinates: [-122.4194, 37.7749] // Mock coordinates
-      },
-      area_hectares: mockArea,
+    if (!map.current) return;
+    
+    // Mock geocoding for demo - in real app, use Mapbox Geocoding API
+    const mockCoordinates: [number, number] = [-122.4194 + (Math.random() - 0.5) * 0.1, 37.7749 + (Math.random() - 0.5) * 0.1];
+    
+    // Clear previous search marker
+    if (searchMarker) {
+      searchMarker.remove();
+    }
+    
+    // Add search marker
+    const marker = new mapboxgl.Marker({ color: '#3b82f6' })
+      .setLngLat(mockCoordinates)
+      .addTo(map.current);
+    
+    setSearchMarker(marker);
+    
+    // Center map on searched location
+    map.current.flyTo({
+      center: mockCoordinates,
+      zoom: 15,
+      duration: 2000
     });
     
-    toast(`Found property: ${address}. Area: ${mockArea.toFixed(2)} hectares`);
+    toast(`Found location: ${address}. Now draw a polygon to select your area.`);
   };
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-12">
       <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold text-foreground mb-4">Select Your Property</h2>
+        <h2 className="text-3xl font-bold text-foreground mb-4">Calculate Carbon Storage</h2>
         <p className="text-muted-foreground max-w-2xl mx-auto">
-          Choose your property using address search, GPS coordinates, or draw a custom boundary on the map.
+          Search for a location and draw a polygon to calculate the carbon storage for that area.
         </p>
       </div>
 
@@ -356,7 +394,7 @@ export const MapInterface = () => {
         <div className="md:col-span-1 space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Property Selection</CardTitle>
+              <CardTitle className="text-lg">Area Selection</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Address Search */}
@@ -364,7 +402,7 @@ export const MapInterface = () => {
                 <label className="text-sm font-medium">Search by Address</label>
                 <div className="flex gap-2">
                   <Input
-                    placeholder="Enter address..."
+                    placeholder="Enter address, city, or location..."
                     value={address}
                     onChange={(e) => setAddress(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleAddressSearch()}
@@ -375,28 +413,6 @@ export const MapInterface = () => {
                 </div>
               </div>
 
-              {/* GPS Pin */}
-              <Button variant="outline" className="w-full justify-start">
-                <MapPin className="w-4 h-4 mr-2" />
-                Drop GPS Pin
-              </Button>
-
-              {/* Upload Boundary */}
-              <Button variant="outline" className="w-full justify-start">
-                <Upload className="w-4 h-4 mr-2" />
-                Upload Boundary
-              </Button>
-
-              {/* Clear Map */}
-              <Button 
-                variant="outline" 
-                className="w-full justify-start"
-                onClick={clearMap}
-              >
-                <Square className="w-4 h-4 mr-2" />
-                Clear Map
-              </Button>
-
               {/* Draw Boundary */}
               <div className="space-y-2">
                 <Button 
@@ -405,7 +421,7 @@ export const MapInterface = () => {
                   onClick={() => setDrawingMode(!drawingMode)}
                 >
                   <Square className="w-4 h-4 mr-2" />
-                  {drawingMode ? 'Stop Drawing' : 'Draw Boundary'}
+                  {drawingMode ? 'Stop Drawing' : 'Draw Area Boundary'}
                 </Button>
                 
                 {drawingMode && (
@@ -420,7 +436,7 @@ export const MapInterface = () => {
                             className="ml-2 h-6"
                             onClick={finishDrawing}
                           >
-                            Finish
+                            Calculate Carbon
                           </Button>
                         )}
                       </div>
@@ -428,20 +444,30 @@ export const MapInterface = () => {
                   </div>
                 )}
               </div>
+
+              {/* Clear Map */}
+              <Button 
+                variant="outline" 
+                className="w-full justify-start"
+                onClick={clearMap}
+              >
+                <Square className="w-4 h-4 mr-2" />
+                Clear Map
+              </Button>
             </CardContent>
           </Card>
 
-          {/* Selected Property Info */}
-          {selectedProperty && (
+          {/* Selected Area Info */}
+          {selectedArea && (
             <Card className="border-primary/20 bg-primary/5">
               <CardHeader>
-                <CardTitle className="text-lg text-primary">Selected Property</CardTitle>
+                <CardTitle className="text-lg text-primary">Selected Area</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span>Area:</span>
-                    <span className="font-medium">{selectedProperty.area_hectares.toFixed(2)} ha</span>
+                    <span className="font-medium">{selectedArea.area_hectares.toFixed(2)} ha</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Resolution:</span>
@@ -458,14 +484,16 @@ export const MapInterface = () => {
                       </div>
                     </div>
                   )}
-                  <Button 
-                    className="w-full mt-4" 
-                    size="sm"
-                    onClick={() => calculateCarbon(selectedProperty)}
-                    disabled={calculationLoading}
-                  >
-                    {calculationLoading ? 'Calculating...' : 'Calculate Carbon Storage'}
-                  </Button>
+                  {!carbonCalculation && (
+                    <Button 
+                      className="w-full mt-4" 
+                      size="sm"
+                      onClick={() => calculateCarbonForArea(selectedArea.coordinates, selectedArea.area_hectares)}
+                      disabled={calculationLoading}
+                    >
+                      {calculationLoading ? 'Calculating...' : 'Calculate Carbon Storage'}
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
