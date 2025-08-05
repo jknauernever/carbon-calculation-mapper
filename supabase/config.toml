@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.test-gee-hardcoded]
 verify_jwt = false
+
+[functions.gee-ndvi-node]
+verify_jwt = false
