@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Search, MapPin, Upload, Square } from "lucide-react";
 import { toast } from "sonner";
 import { useProperty } from "@/hooks/useProperty";
+import { CarbonMethodologyInfo } from "./CarbonMethodologyInfo";
 import { supabase } from "@/integrations/supabase/client";
 
 export const MapInterface = () => {
@@ -448,9 +449,12 @@ export const MapInterface = () => {
                   </div>
                   {carbonCalculation && (
                     <div className="border-t pt-2 mt-2">
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center">
                         <span>Carbon Storage:</span>
-                        <span className="font-medium text-primary">{carbonCalculation.total_co2e.toFixed(1)} t CO₂e</span>
+                        <div className="flex items-center gap-1">
+                          <span className="font-medium text-primary">{carbonCalculation.total_co2e.toFixed(1)} t CO₂e</span>
+                          <CarbonMethodologyInfo />
+                        </div>
                       </div>
                     </div>
                   )}
