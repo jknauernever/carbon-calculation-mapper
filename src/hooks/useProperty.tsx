@@ -110,8 +110,8 @@ export const useProperty = () => {
         return existingCalculation;
       }
 
-      // Call edge function to calculate carbon
-      const { data, error } = await supabase.functions.invoke('calculate-carbon', {
+      // Call enhanced GEE edge function to calculate carbon
+      const { data, error } = await supabase.functions.invoke('calculate-carbon-gee', {
         body: {
           propertyId: property.id,
           geometry: property.geometry,

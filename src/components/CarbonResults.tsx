@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { TreePine, Wheat, Mountain, Download, FileText } from "lucide-react";
 import { useProperty } from "@/hooks/useProperty";
+import { GEEDataVisualization } from "./GEEDataVisualization";
 
 export const CarbonResults = () => {
   const { selectedProperty, carbonCalculation } = useProperty();
@@ -134,36 +135,39 @@ export const CarbonResults = () => {
         </Card>
       </div>
 
-      {/* Methodology */}
-      <Card>
+      {/* Enhanced GEE Data Visualization */}
+      <GEEDataVisualization carbonCalculation={carbonCalculation} />
+
+      {/* Enhanced Methodology */}
+      <Card className="mt-6">
         <CardHeader>
-          <CardTitle>Calculation Methodology</CardTitle>
+          <CardTitle>Enhanced GEE Calculation Methodology</CardTitle>
         </CardHeader>
         <CardContent className="grid md:grid-cols-3 gap-6 text-sm">
           <div className="space-y-2">
-            <h4 className="font-semibold text-primary">Data Sources</h4>
+            <h4 className="font-semibold text-primary">Satellite Data Sources</h4>
             <ul className="space-y-1 text-muted-foreground">
               <li>• Sentinel-2 NDVI (10m resolution)</li>
-              <li>• Copernicus Land Cover (10m)</li>
-              <li>• SoilGrids soil carbon data</li>
-              <li>• IPCC carbon conversion factors</li>
+              <li>• Copernicus Global Land Cover (10m)</li>
+              <li>• SoilGrids 2.0 soil carbon data</li>
+              <li>• Google Earth Engine processing</li>
             </ul>
           </div>
           <div className="space-y-2">
-            <h4 className="font-semibold text-primary">Calculation Models</h4>
+            <h4 className="font-semibold text-primary">Advanced Models</h4>
             <ul className="space-y-1 text-muted-foreground">
-              <li>• NDVI-to-biomass regression for forests</li>
-              <li>• Allometric equations for AGB/BGB</li>
-              <li>• Soil carbon density interpolation</li>
-              <li>• 3.67 multiplier for CO₂ equivalent</li>
+              <li>• NDVI-based allometric equations</li>
+              <li>• Land cover specific coefficients</li>
+              <li>• Temporal NDVI compositing</li>
+              <li>• Cloud masking and quality filtering</li>
             </ul>
           </div>
           <div className="space-y-2">
-            <h4 className="font-semibold text-primary">Accuracy & Validation</h4>
+            <h4 className="font-semibold text-primary">Quality Assurance</h4>
             <ul className="space-y-1 text-muted-foreground">
-              <li>• ±15% uncertainty for biomass estimates</li>
-              <li>• ±25% uncertainty for soil carbon</li>
-              <li>• Ground-truth validation ongoing</li>
+              <li>• Statistical uncertainty quantification</li>
+              <li>• Multi-temporal data validation</li>
+              <li>• Automated quality scoring</li>
               <li>• Peer-reviewed methodologies</li>
             </ul>
           </div>
