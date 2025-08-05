@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Hero } from "@/components/Hero";
 import { MapInterface } from "@/components/MapInterface";
-import { CarbonResults } from "@/components/CarbonResults";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
@@ -42,7 +41,6 @@ const Index = () => {
       </div>
       <Hero />
       <MapInterface />
-      <CarbonResults />
     </div>
   );
 };
