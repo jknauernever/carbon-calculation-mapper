@@ -296,6 +296,8 @@ async function generateGEETileUrl(layerId: string, bbox: number[]): Promise<stri
   try {
     // Get GEE service account credentials
     const geeServiceAccount = Deno.env.get('GEE_SERVICE_ACCOUNT');
+    console.log('🔍 Raw GEE_SERVICE_ACCOUNT value:', geeServiceAccount ? geeServiceAccount.substring(0, 100) + '...' : 'NOT SET');
+    
     if (!geeServiceAccount) {
       throw new Error('GEE_SERVICE_ACCOUNT not configured. Please add your service account JSON in the Supabase dashboard.');
     }
