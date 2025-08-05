@@ -450,33 +450,139 @@ async function getGEEAuthToken(serviceAccount: any): Promise<string> {
 }
 
 async function createJWT(header: any, payload: any, privateKey: string): Promise<string> {
-  // This is a simplified JWT creation - in production you'd use a proper crypto library
-  const base64Header = btoa(JSON.stringify(header));
-  const base64Payload = btoa(JSON.stringify(payload));
+  const base64Header = btoa(JSON.stringify(header)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  const base64Payload = btoa(JSON.stringify(payload)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
   
-  // For demo purposes, return a mock JWT
-  // In production, this would be properly signed with the private key
-  return `${base64Header}.${base64Payload}.mock-signature`;
+  const data = `${base64Header}.${base64Payload}`;
+  
+  // Import the private key and sign with RS256
+  const keyData = privateKey
+    .replace(/-----BEGIN PRIVATE KEY-----/, '')
+    .replace(/-----END PRIVATE KEY-----/, '')
+    .replace(/\s/g, '');
+  
+  const binaryKey = Uint8Array.from(atob(keyData), c => c.charCodeAt(0));
+  
+  const cryptoKey = await crypto.subtle.importKey(
+    'pkcs8',
+    binaryKey,
+    {
+      name: 'RSASSA-PKCS1-v1_5',
+      hash: 'SHA-256',
+    },
+    false,
+    ['sign']
+  );
+  
+  const signature = await crypto.subtle.sign(
+    'RSASSA-PKCS1-v1_5',
+    cryptoKey,
+    new TextEncoder().encode(data)
+  );
+  
+  const base64Signature = btoa(String.fromCharCode(...new Uint8Array(signature)))
+    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+  
+  return `${data}.${base64Signature}`;
 }
 
 async function createNDVIImage(authToken: string, bbox: number[]): Promise<string> {
-  const geeCode = `
-    // Get latest Sentinel-2 imagery
-    var geometry = ee.Geometry.Rectangle([${bbox.join(', ')}]);
-    var collection = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')
-      .filterBounds(geometry)
-      .filterDate('2024-01-01', '2025-01-01')
-      .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 20))
-      .median();
-    
-    // Calculate NDVI
-    var ndvi = collection.normalizedDifference(['B8', 'B4']).rename('NDVI');
-    
-    // Export as map ID
-    Map.addLayer(ndvi, {min: -0.2, max: 0.8, palette: ['d73027', 'f46d43', 'fdae61', 'fee08b', 'e6f598', 'abdda4', '66c2a5', '3288bd']}, 'NDVI');
-  `;
+  console.log('🌱 Creating NDVI from Sentinel-2 data...');
   
-  return await executeGEECode(authToken, geeCode);
+  // Create a simplified approach using direct API calls
+  const mapRequest = {
+    "expression": {
+      "functionInvocationValue": {
+        "functionName": "Image.normalizedDifference",
+        "arguments": {
+          "this": {
+            "functionInvocationValue": {
+              "functionName": "ImageCollection.median",
+              "arguments": {
+                "this": {
+                  "functionInvocationValue": {
+                    "functionName": "ImageCollection.filter", 
+                    "arguments": {
+                      "this": {
+                        "functionInvocationValue": {
+                          "functionName": "ImageCollection.filterDate",
+                          "arguments": {
+                            "this": {
+                              "functionInvocationValue": {
+                                "functionName": "ImageCollection.filterBounds",
+                                "arguments": {
+                                  "this": {
+                                    "functionInvocationValue": {
+                                      "functionName": "ImageCollection",
+                                      "arguments": {
+                                        "id": {
+                                          "constantValue": "COPERNICUS/S2_SR_HARMONIZED"
+                                        }
+                                      }
+                                    }
+                                  },
+                                  "geometry": {
+                                    "functionInvocationValue": {
+                                      "functionName": "Geometry.Rectangle",
+                                      "arguments": {
+                                        "coords": {
+                                          "arrayValue": {
+                                            "values": [
+                                              { "constantValue": bbox[0] },
+                                              { "constantValue": bbox[1] },
+                                              { "constantValue": bbox[2] },
+                                              { "constantValue": bbox[3] }
+                                            ]
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            "start": {
+                              "constantValue": "2024-01-01"
+                            },
+                            "end": {
+                              "constantValue": "2025-01-01"
+                            }
+                          }
+                        }
+                      },
+                      "condition": {
+                        "functionInvocationValue": {
+                          "functionName": "Filter.lt",
+                          "arguments": {
+                            "name": {
+                              "constantValue": "CLOUDY_PIXEL_PERCENTAGE"
+                            },
+                            "value": {
+                              "constantValue": 20
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "bandNames": {
+            "arrayValue": {
+              "values": [
+                { "constantValue": "B8" },
+                { "constantValue": "B4" }
+              ]
+            }
+          }
+        }
+      }
+    }
+  };
+  
+  return await executeGEECode(authToken, mapRequest);
 }
 
 async function createLandCoverImage(authToken: string, bbox: number[]): Promise<string> {
@@ -535,21 +641,39 @@ async function createCloudImage(authToken: string, bbox: number[]): Promise<stri
   return await executeGEECode(authToken, geeCode);
 }
 
-async function executeGEECode(authToken: string, code: string): Promise<string> {
-  // This would call the GEE Code Editor API to execute the Earth Engine code
-  // For now, return a mock map ID that represents the processed image
-  console.log('📊 Executing GEE code:', code.substring(0, 100) + '...');
+async function executeGEECode(authToken: string, imageExpression: any): Promise<string> {
+  console.log('📊 Creating GEE map with expression...');
   
-  // In a real implementation, this would call:
-  // https://earthengine.googleapis.com/v1/projects/{project}/maps
-  
-  return `gee-map-id-${Date.now()}`;
+  try {
+    // Create a map using the GEE REST API
+    const response = await fetch('https://earthengine.googleapis.com/v1/projects/earthengine-legacy/maps', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(imageExpression)
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ GEE API error:', response.status, errorText);
+      throw new Error(`GEE API failed: ${response.status} - ${errorText}`);
+    }
+    
+    const result = await response.json();
+    console.log('✅ GEE map created:', result.name);
+    return result.name; // This is the map ID
+  } catch (error) {
+    console.error('❌ Failed to execute GEE code:', error);
+    throw error;
+  }
 }
 
 async function getGEETileUrl(authToken: string, imageId: string, visualizationParams: any): Promise<string> {
-  // This would get the actual tile URL from GEE
-  // For now, return a properly formatted GEE tile URL template
+  // Extract the map ID from the full resource name
+  const mapId = imageId.split('/').pop();
   
-  const tileBaseUrl = 'https://earthengine.googleapis.com/v1/projects/ee-carbon-project/maps';
-  return `${tileBaseUrl}/${imageId}/tiles/{z}/{x}/{y}?token=${authToken}`;
+  // Return the actual GEE tile URL template
+  return `https://earthengine.googleapis.com/v1/${imageId}/tiles/{z}/{x}/{y}`;
 }
