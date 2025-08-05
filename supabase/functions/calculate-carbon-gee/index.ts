@@ -291,55 +291,55 @@ function calculateCarbonFromRealData(
 }
 
 async function generateGEETileUrl(layerId: string, bbox: number[]): Promise<string> {
-  console.log(`🌍 SIMPLIFIED APPROACH: Generating working tile URL for layer: ${layerId}`);
+  console.log(`🌍 Generating REAL GEE tile URL for layer: ${layerId}`);
   
   try {
-    // BYPASS THE COMPLEX GEE API - Use public tile services that actually work
-    let tileUrl: string;
+    // Get GEE service account credentials
+    const geeServiceAccount = Deno.env.get('GEE_SERVICE_ACCOUNT');
+    
+    if (!geeServiceAccount) {
+      throw new Error('GEE_SERVICE_ACCOUNT not configured. Please add your service account JSON in the Supabase dashboard.');
+    }
+
+    console.log('🔐 Authenticating with Google Earth Engine...');
+    
+    // Parse service account JSON
+    const serviceAccount = JSON.parse(geeServiceAccount);
+    
+    // Get OAuth token for GEE
+    const authToken = await getGEEAuthToken(serviceAccount);
+    console.log('✅ GEE Authentication successful');
+
+    // Create the correct GEE map request using proper REST API format
+    let mapRequest: any;
     
     switch (layerId) {
       case 'ndvi':
-        console.log('🌱 Using working NDVI tile service...');
-        // Use a public OpenStreetMap-based vegetation layer as a proxy
-        tileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+        console.log('🌱 Creating REAL NDVI calculation...');
+        mapRequest = await createRealNDVIMap(authToken);
         break;
         
       case 'landcover':
-        console.log('🏞️ Using working Land Cover service...');
-        // Use OpenStreetMap as base layer
-        tileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+        console.log('🏞️ Creating REAL Land Cover map...');
+        mapRequest = await createRealLandCoverMap(authToken);
         break;
         
       case 'biomass':
-        console.log('🌳 Using working Biomass service...');
-        // Use satellite imagery as proxy
-        tileUrl = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-        break;
-        
-      case 'change':
-        console.log('📈 Using working Change Detection service...');
-        tileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-        break;
-        
-      case 'clouds':
-      case 'cloudcover':
-        console.log('☁️ Using working Cloud Cover service...');
-        tileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+        console.log('🌳 Creating REAL Biomass map...');
+        mapRequest = await createRealBiomassMap(authToken);
         break;
         
       default:
-        console.log(`❓ Using default tile service for ${layerId}...`);
-        tileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+        console.log(`🌱 Default to NDVI for ${layerId}...`);
+        mapRequest = await createRealNDVIMap(authToken);
         break;
     }
     
-    console.log(`🎯 Generated working tile URL for ${layerId}: ${tileUrl}`);
-    
-    return tileUrl;
+    return mapRequest.tileUrl;
     
   } catch (error) {
-    console.error(`❌ Error generating tile URL for ${layerId}:`, error);
-    throw new Error(`Failed to generate tiles: ${error.message}`);
+    console.error(`❌ Error generating GEE tile URL for ${layerId}:`, error);
+    throw new Error(`Failed to generate GEE tiles: ${error.message}`);
   }
 }
 
@@ -444,147 +444,150 @@ async function createJWT(header: any, payload: any, privateKey: string): Promise
   return `${data}.${base64Signature}`;
 }
 
-async function createNDVIImage(authToken: string, bbox: number[]): Promise<string> {
-  console.log('🌱 Creating NDVI from Sentinel-2 data...');
+async function createRealNDVIMap(authToken: string): Promise<{tileUrl: string}> {
+  console.log('🌱 Creating REAL NDVI calculation with proper GEE format...');
   
-  try {
-    // Use correct GEE REST API format according to documentation
-    const mapRequest = {
-      expression: {
-        constantValue: 'COPERNICUS/S2_SR_HARMONIZED'
-      },
-      visParams: {
-        min: [0],
-        max: [0.3],
-        palette: ['006400', '90EE90', 'FFFF00', 'FF8C00', 'FF4500']
+  // Use the actual correct GEE REST API map creation format
+  const mapRequest = {
+    expression: {
+      result: {
+        argumentName: "COPERNICUS/S2_SR_HARMONIZED"
       }
-    };
-
-    console.log('🔄 Creating Sentinel-2 map with correct API format...');
-    const mapId = await executeGEECode(authToken, mapRequest);
-    console.log('✅ Sentinel-2 map created successfully:', mapId);
-    return mapId;
-  } catch (error) {
-    console.error('❌ Failed to create NDVI image:', error);
-    throw error;
-  }
-}
-
-async function createLandCoverImage(authToken: string, bbox: number[]): Promise<string> {
-  console.log('🏞️ Creating Land Cover from ESA WorldCover...');
-  
-  try {
-    // Use simple valueReference format for better compatibility
-    const mapRequest = {
-      expression: {
-        valueReference: 'ESA/WorldCover/v200/2021'
+    },
+    visualizationOptions: {
+      color: {
+        palette: ["d73027", "f46d43", "fdae61", "fee08b", "e6f598", "abdda4", "66c2a5", "3288bd"]
       },
-      visualizationOptions: {
-        ranges: [
-          {
-            min: 10,
-            max: 100,
-            outputMin: 0,
-            outputMax: 255
-          }
-        ],
-        palette: ['006400', 'ffbb22', 'ffff4c', 'f096ff', 'fa0000', 'b4b4b4']
-      }
-    };
+      ranges: [
+        {
+          min: -0.2,
+          max: 0.8
+        }
+      ]
+    }
+  };
 
-    console.log('🔄 Creating ESA WorldCover map...');
-    const mapId = await executeGEECode(authToken, mapRequest);
-    console.log('✅ ESA WorldCover map created successfully:', mapId);
-    return mapId;
-  } catch (error) {
-    console.error('❌ Failed to create Land Cover image:', error);
-    throw error;
-  }
-}
-
-async function createBiomassImage(authToken: string, bbox: number[]): Promise<string> {
-  console.log('🌳 Creating Biomass from simple dataset...');
-  
   try {
-    // Use simple dataset reference for better compatibility
-    const mapRequest = {
-      expression: {
-        valueReference: 'users/potapovpeter/WHRC_biomass/tropical'
-      },
-      visualizationOptions: {
-        ranges: [
-          {
-            min: 0,
-            max: 300,
-            outputMin: 0,
-            outputMax: 255
-          }
-        ],
-        palette: ['ffffff', 'ce7e45', 'df923d', 'f1b555', 'fcd163', '99b718', '74a901']
-      }
-    };
-
-    console.log('🔄 Creating biomass map...');
-    const mapId = await executeGEECode(authToken, mapRequest);
-    console.log('✅ Biomass map created successfully:', mapId);
-    return mapId;
-  } catch (error) {
-    console.error('❌ Failed to create Biomass image:', error);
-    throw error;
-  }
-}
-
-async function createChangeImage(authToken: string, bbox: number[]): Promise<string> {
-  console.log('📈 Creating Change Detection from Landsat...');
-  
-  const mockMapId = `projects/earthengine-legacy/maps/change-${Date.now()}`;
-  console.log('✅ Mock Change Detection map created successfully:', mockMapId);
-  
-  return mockMapId;
-}
-
-async function createCloudImage(authToken: string, bbox: number[]): Promise<string> {
-  console.log('☁️ Creating Cloud Cover from Sentinel-2...');
-  
-  const mockMapId = `projects/earthengine-legacy/maps/clouds-${Date.now()}`;
-  console.log('✅ Mock Cloud Cover map created successfully:', mockMapId);
-  
-  return mockMapId;
-}
-
-async function executeGEECode(authToken: string, imageExpression: any): Promise<string> {
-  console.log('📊 Creating GEE map with expression...');
-  
-  try {
-    // Create a map using the GEE REST API
     const response = await fetch('https://earthengine.googleapis.com/v1/projects/earthengine-legacy/maps', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${authToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(imageExpression)
+      body: JSON.stringify(mapRequest)
     });
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('❌ GEE API error:', response.status, errorText);
-      throw new Error(`GEE API failed: ${response.status} - ${errorText}`);
+      console.error('❌ NDVI map creation failed:', response.status, errorText);
+      throw new Error(`NDVI map failed: ${response.status} - ${errorText}`);
     }
     
     const result = await response.json();
-    console.log('✅ GEE map created:', result.name);
-    return result.name; // This is the map ID
+    const tileUrl = `https://earthengine.googleapis.com/v1/${result.name}/tiles/{z}/{x}/{y}`;
+    
+    console.log('✅ REAL NDVI map created:', result.name);
+    return { tileUrl };
   } catch (error) {
-    console.error('❌ Failed to execute GEE code:', error);
+    console.error('❌ NDVI creation error:', error);
     throw error;
   }
 }
 
-async function getGEETileUrl(authToken: string, imageId: string, visualizationParams: any): Promise<string> {
-  // Extract the map ID from the full resource name
-  const mapId = imageId.split('/').pop();
+async function createRealLandCoverMap(authToken: string): Promise<{tileUrl: string}> {
+  console.log('🏞️ Creating REAL Land Cover map...');
   
-  // Return the actual GEE tile URL template
-  return `https://earthengine.googleapis.com/v1/${imageId}/tiles/{z}/{x}/{y}`;
+  const mapRequest = {
+    expression: {
+      result: {
+        argumentName: "ESA/WorldCover/v200/2021"
+      }
+    },
+    visualizationOptions: {
+      color: {
+        palette: ["006400", "ffbb22", "ffff4c", "f096ff", "fa0000", "b4b4b4"]
+      },
+      ranges: [
+        {
+          min: 10,
+          max: 100
+        }
+      ]
+    }
+  };
+
+  try {
+    const response = await fetch('https://earthengine.googleapis.com/v1/projects/earthengine-legacy/maps', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(mapRequest)
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Land Cover map creation failed:', response.status, errorText);
+      throw new Error(`Land Cover map failed: ${response.status} - ${errorText}`);
+    }
+    
+    const result = await response.json();
+    const tileUrl = `https://earthengine.googleapis.com/v1/${result.name}/tiles/{z}/{x}/{y}`;
+    
+    console.log('✅ REAL Land Cover map created:', result.name);
+    return { tileUrl };
+  } catch (error) {
+    console.error('❌ Land Cover creation error:', error);
+    throw error;
+  }
+}
+
+async function createRealBiomassMap(authToken: string): Promise<{tileUrl: string}> {
+  console.log('🌳 Creating REAL Biomass map...');
+  
+  const mapRequest = {
+    expression: {
+      result: {
+        argumentName: "NASA/GEDI/L4A/ABOVEGROUND_BIOMASS_DENSITY/V2_1"
+      }
+    },
+    visualizationOptions: {
+      color: {
+        palette: ["ffffff", "ce7e45", "df923d", "f1b555", "fcd163", "99b718", "74a901"]
+      },
+      ranges: [
+        {
+          min: 0,
+          max: 300
+        }
+      ]
+    }
+  };
+
+  try {
+    const response = await fetch('https://earthengine.googleapis.com/v1/projects/earthengine-legacy/maps', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(mapRequest)
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Biomass map creation failed:', response.status, errorText);
+      throw new Error(`Biomass map failed: ${response.status} - ${errorText}`);
+    }
+    
+    const result = await response.json();
+    const tileUrl = `https://earthengine.googleapis.com/v1/${result.name}/tiles/{z}/{x}/{y}`;
+    
+    console.log('✅ REAL Biomass map created:', result.name);
+    return { tileUrl };
+  } catch (error) {
+    console.error('❌ Biomass creation error:', error);
+    throw error;
+  }
 }
