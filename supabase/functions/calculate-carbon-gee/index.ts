@@ -293,9 +293,39 @@ function calculateCarbonFromRealData(
 async function generateGEETileUrl(layerId: string, bbox: number[]): Promise<string> {
   console.log(`Generating tile URL for layer: ${layerId}`);
   
-  // For now, return a working tile service URL
-  // OpenStreetMap-based tile service as placeholder
-  const tileUrl = `https://tile.openstreetmap.org/{z}/{x}/{y}.png`;
+  let tileUrl: string;
+  
+  switch (layerId) {
+    case 'ndvi':
+      // MODIS NDVI tiles from NASA GIBS
+      tileUrl = `https://map1.vis.earthdata.nasa.gov/wmts-geo/1.0.0/MOD13A2_M_NDVI/default/{time}/250m/{z}/{y}/{x}.png`;
+      break;
+      
+    case 'landcover':
+      // ESA WorldCover tiles
+      tileUrl = `https://services.terrascope.be/wms/v2?service=WMS&request=GetMap&layers=ESA_WORLDCOVER_10M_2021_V2&styles=&format=image%2Fpng&transparent=true&version=1.1.1&width=256&height=256&srs=EPSG%3A3857&bbox={bbox}`;
+      break;
+      
+    case 'biomass':
+      // ESA Biomass tiles
+      tileUrl = `https://services.terrascope.be/wms/v2?service=WMS&request=GetMap&layers=ESA_BIOMASS_2020&styles=&format=image%2Fpng&transparent=true&version=1.1.1&width=256&height=256&srs=EPSG%3A3857&bbox={bbox}`;
+      break;
+      
+    case 'change':
+      // Sentinel-2 change detection visualization
+      tileUrl = `https://sh-services.sentinel-hub.com/ogc/wmts/1.0.0/tiles/1.0.0/S2L2A-AGRICULTURE/{z}/{x}/{y}?time=2023-01-01/2023-12-31`;
+      break;
+      
+    case 'clouds':
+      // Cloud coverage from Sentinel-2
+      tileUrl = `https://sh-services.sentinel-hub.com/ogc/wmts/1.0.0/tiles/1.0.0/S2L2A-CLOUDMASK/{z}/{x}/{y}?time=2023-01-01/2023-12-31`;
+      break;
+      
+    default:
+      // Fallback to a neutral satellite base layer
+      tileUrl = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}`;
+      break;
+  }
   
   console.log(`Generated tile URL for ${layerId}: ${tileUrl}`);
   return tileUrl;
