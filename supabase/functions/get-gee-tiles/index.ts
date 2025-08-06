@@ -54,34 +54,77 @@ serve(async (req) => {
       );
     }
 
-    // If z, x, y are provided, this is a tile request - proxy to the actual API
+    // If z, x, y are provided, this is a tile request - get the tile URL first, then fetch the tile
     if (z && x && y) {
-      const tileUrl = `https://gee-tile-server.vercel.app/api/tiles/${z}/${x}/${y}?dataset=${dataset}&year=${year}&month=${month}&apikey=${geeApiKey}`;
+      console.log('Fetching tile for coordinates:', { z, x, y, dataset, year, month });
       
-      console.log('Fetching tile from:', tileUrl);
+      // First get the tile URL from the Vercel API
+      const apiUrl = `https://gee-tile-server.vercel.app/api/tiles?dataset=${dataset}&year=${year}&month=${month}&apikey=${geeApiKey}`;
       
-      const tileResponse = await fetch(tileUrl);
-      
-      if (!tileResponse.ok) {
-        console.error('Tile fetch failed:', tileResponse.status, tileResponse.statusText);
+      try {
+        const apiResponse = await fetch(apiUrl);
+        
+        if (!apiResponse.ok) {
+          console.error('API response failed:', apiResponse.status);
+          return new Response(
+            JSON.stringify({ error: `API failed: ${apiResponse.status}` }),
+            { 
+              status: apiResponse.status, 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            }
+          );
+        }
+        
+        const apiData = await apiResponse.json();
+        
+        if (!apiData.tile_url) {
+          console.error('No tile_url in API response:', apiData);
+          return new Response(
+            JSON.stringify({ error: 'No tile URL available' }),
+            { 
+              status: 500, 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            }
+          );
+        }
+        
+        // Now fetch the actual tile from GEE
+        const tileUrl = apiData.tile_url.replace('{z}', z).replace('{x}', x).replace('{y}', y);
+        console.log('Fetching tile from GEE:', tileUrl);
+        
+        const tileResponse = await fetch(tileUrl);
+        
+        if (!tileResponse.ok) {
+          console.error('Tile fetch failed:', tileResponse.status, tileResponse.statusText);
+          return new Response(
+            JSON.stringify({ error: `Tile fetch failed: ${tileResponse.status}` }),
+            { 
+              status: tileResponse.status, 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            }
+          );
+        }
+
+        // Return the tile data with appropriate headers
+        const tileData = await tileResponse.arrayBuffer();
+        return new Response(tileData, {
+          headers: {
+            ...corsHeaders,
+            'Content-Type': tileResponse.headers.get('Content-Type') || 'image/png',
+            'Cache-Control': 'public, max-age=3600', // Cache tiles for 1 hour
+          }
+        });
+        
+      } catch (error) {
+        console.error('Error fetching tile:', error);
         return new Response(
-          JSON.stringify({ error: `Tile fetch failed: ${tileResponse.status}` }),
+          JSON.stringify({ error: `Tile fetch error: ${error.message}` }),
           { 
-            status: tileResponse.status, 
+            status: 500, 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
           }
         );
       }
-
-      // Return the tile data with appropriate headers
-      const tileData = await tileResponse.arrayBuffer();
-      return new Response(tileData, {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': tileResponse.headers.get('Content-Type') || 'image/png',
-          'Cache-Control': 'public, max-age=3600', // Cache tiles for 1 hour
-        }
-      });
     }
 
     // If no tile coordinates, return our custom URL template directly
