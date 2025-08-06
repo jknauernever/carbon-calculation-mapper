@@ -218,6 +218,20 @@ export const MapInterface = () => {
     if (!map.current) return;
 
     map.current.on('click', handleMapClick);
+    
+    // Add keyboard event listeners
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && drawingMode) {
+        cancelDrawing();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    
+    // Store cleanup function
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   };
 
   const handleMapClick = (e: mapboxgl.MapMouseEvent) => {
@@ -227,13 +241,59 @@ export const MapInterface = () => {
     const newCoordinates = [...coordinates, [lng, lat] as [number, number]];
     setCoordinates(newCoordinates);
 
+    // Add visual marker for the clicked point
+    addPointMarker(lng, lat, newCoordinates.length);
+
+    // Auto-complete polygon and calculate carbon when we have 3+ points
     if (newCoordinates.length >= 3) {
-      addPolygonToMap(newCoordinates);
+      completePolygonAndCalculate(newCoordinates);
     }
   };
 
-  const addPolygonToMap = (coords: Array<[number, number]>) => {
+  const addPointMarker = (lng: number, lat: number, pointNumber: number) => {
     if (!map.current) return;
+
+    const markerId = `drawing-point-${pointNumber}`;
+    
+    // Remove existing marker if it exists
+    if (map.current.getSource(markerId)) {
+      if (map.current.getLayer(markerId)) {
+        map.current.removeLayer(markerId);
+      }
+      map.current.removeSource(markerId);
+    }
+
+    // Add point marker
+    map.current.addSource(markerId, {
+      type: 'geojson',
+      data: {
+        type: 'Feature',
+        properties: { pointNumber },
+        geometry: {
+          type: 'Point',
+          coordinates: [lng, lat]
+        }
+      }
+    });
+
+    map.current.addLayer({
+      id: markerId,
+      type: 'circle',
+      source: markerId,
+      paint: {
+        'circle-radius': 6,
+        'circle-color': '#2563eb',
+        'circle-stroke-width': 2,
+        'circle-stroke-color': '#ffffff'
+      }
+    });
+  };
+
+  const completePolygonAndCalculate = async (coords: Array<[number, number]>) => {
+    if (!map.current) return;
+
+    // Clear any existing markers
+    clearDrawingMarkers();
 
     // Close the polygon
     const closedCoords = [...coords, coords[0]];
@@ -289,6 +349,25 @@ export const MapInterface = () => {
     setSelectedArea({ coordinates: coords, area });
     setDrawingMode(false);
     setCoordinates([]);
+
+    // Automatically start carbon calculation
+    toast.success(`Area drawn: ${area.toFixed(2)} hectares. Starting carbon calculation...`);
+    await calculateCarbonForSelectedArea({ coordinates: coords, area });
+  };
+
+  const clearDrawingMarkers = () => {
+    if (!map.current) return;
+    
+    // Remove all drawing point markers
+    for (let i = 1; i <= 10; i++) { // Clear up to 10 potential markers
+      const markerId = `drawing-point-${i}`;
+      if (map.current.getLayer(markerId)) {
+        map.current.removeLayer(markerId);
+      }
+      if (map.current.getSource(markerId)) {
+        map.current.removeSource(markerId);
+      }
+    }
   };
 
   const calculatePolygonArea = (coords: Array<[number, number]>): number => {
@@ -306,16 +385,14 @@ export const MapInterface = () => {
     setDrawingMode(true);
     setCoordinates([]);
     clearMap();
-    toast.info('Click on the map to draw a polygon. Need at least 3 points.');
+    toast.info('Click 3+ points on the map to draw an area. Auto-completes at 3 points.');
   };
 
-  const finishDrawing = () => {
-    if (coordinates.length >= 3) {
-      addPolygonToMap(coordinates);
-      calculateCarbonForArea();
-    } else {
-      toast.error('Need at least 3 points to create a polygon');
-    }
+  const cancelDrawing = () => {
+    setDrawingMode(false);
+    setCoordinates([]);
+    clearDrawingMarkers();
+    toast.info('Drawing cancelled');
   };
 
   const clearMap = () => {
@@ -326,6 +403,9 @@ export const MapInterface = () => {
     setCoordinates([]);
     setSelectedArea(null);
     setCarbonCalculation(null);
+
+    // Clear drawing markers
+    clearDrawingMarkers();
 
     // Remove map layers
     const layersToRemove = ['selected-area-fill', 'selected-area-outline'];
@@ -348,18 +428,16 @@ export const MapInterface = () => {
   };
 
 
-  const calculateCarbonForArea = async () => {
-    if (!selectedArea) return;
-
+  const calculateCarbonForSelectedArea = async (area: { coordinates: Array<[number, number]>; area: number }) => {
     setIsCalculating(true);
     try {
       const { data, error } = await supabase.functions.invoke('calculate-carbon-gee', {
         body: {
           geometry: {
             type: 'Polygon',
-            coordinates: [selectedArea.coordinates]
+            coordinates: [area.coordinates]
           },
-          areaHectares: selectedArea.area,
+          areaHectares: area.area,
         },
       });
 
@@ -377,6 +455,11 @@ export const MapInterface = () => {
     } finally {
       setIsCalculating(false);
     }
+  };
+
+  const calculateCarbonForArea = async () => {
+    if (!selectedArea) return;
+    await calculateCarbonForSelectedArea(selectedArea);
   };
 
   const handleAddressSearch = async () => {
@@ -672,12 +755,11 @@ export const MapInterface = () => {
               />
               <Button
                 variant={drawingMode ? "default" : "outline"}
-                onClick={drawingMode ? finishDrawing : startDrawing}
-                disabled={drawingMode && coordinates.length < 3}
+                onClick={drawingMode ? cancelDrawing : startDrawing}
                 size="sm"
               >
                 <Square className="w-4 h-4 mr-2" />
-                {drawingMode ? 'Finish Drawing' : 'Draw Area'}
+                {drawingMode ? 'Cancel Drawing' : 'Draw Area (3+ points)'}
               </Button>
               <Button variant="outline" onClick={clearMap} size="sm">
                 <RotateCcw className="w-4 h-4 mr-2" />
@@ -710,8 +792,11 @@ export const MapInterface = () => {
           {drawingMode && (
             <div className="absolute top-4 left-4 bg-card p-3 rounded-lg shadow-lg border border-border">
               <p className="text-sm text-foreground">
-                Drawing mode active. Points: {coordinates.length}
-                {coordinates.length >= 3 ? ' (Ready to finish)' : ' (Need at least 3)'}
+                Drawing mode active. Points: {coordinates.length}/3
+                {coordinates.length >= 3 ? ' (Will auto-complete next click)' : ` (Need ${3 - coordinates.length} more)`}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                ESC to cancel • Auto-completes at 3 points
               </p>
             </div>
           )}
