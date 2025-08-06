@@ -94,9 +94,18 @@ export const MapInterface = () => {
       return;
     }
     
+    // Clean up existing map if it exists but isn't working properly
     if (map.current) {
-      console.log('🗺️ Map already exists, skipping initialization');
-      return;
+      console.log('🗺️ Map already exists, checking if it needs reset...');
+      // Check if map is properly loaded
+      if (map.current.loaded()) {
+        console.log('✅ Existing map is loaded and working');
+        return;
+      } else {
+        console.log('🔄 Existing map not loaded properly, removing and recreating...');
+        map.current.remove();
+        map.current = null;
+      }
     }
 
     const mapboxAccessToken = token || mapboxToken;
