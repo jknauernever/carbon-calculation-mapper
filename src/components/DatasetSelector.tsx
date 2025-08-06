@@ -176,7 +176,7 @@ export const DatasetSelector: React.FC<DatasetSelectorProps> = ({
       </CardHeader>
       {!isCollapsed && (
         <CardContent className="space-y-2">
-        {Object.entries(groupedDatasets).length === 0 ? (
+          {Object.entries(groupedDatasets).length === 0 ? (
           <div className="text-center py-4 text-muted-foreground">
             No datasets available
           </div>
