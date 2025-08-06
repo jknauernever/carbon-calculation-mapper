@@ -123,24 +123,7 @@ export const DatasetTransparencyControls: React.FC<DatasetTransparencyControlsPr
               </div>
             </div>
             
-            {/* Opacity Status - Always Full Opacity */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-muted-foreground">
-                  Opacity
-                </label>
-                <span className="text-xs text-muted-foreground">
-                  100%
-                </span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div className="bg-green-500 h-2 rounded-full" style={{width: '100%'}}></div>
-              </div>
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Transparent</span>
-                <span>Opaque</span>
-              </div>
-            </div>
+            {/* Opacity removed - always full opacity */}
           </div>
         ))}
       </CardContent>
