@@ -602,7 +602,21 @@ export const MapInterface = () => {
         attribution: 'Google Earth Engine via GEE Tile Server'
       });
       
-      // Add raster layer with appropriate styling - increased opacity for visibility
+      // Add raster layer with appropriate styling - ON TOP of base map
+      // Find the best layer to insert before (labels should be on top)
+      const layers = map.current.getStyle().layers;
+      let beforeId: string | undefined;
+      
+      // Look for label layers to insert before them
+      for (const layer of layers) {
+        if (layer.id.includes('label') || layer.id.includes('text') || layer.id.includes('symbol')) {
+          beforeId = layer.id;
+          break;
+        }
+      }
+      
+      console.log('Adding dataset layer before:', beforeId || 'top');
+      
       map.current.addLayer({
         id: 'dataset-layer',
         type: 'raster',
@@ -614,7 +628,7 @@ export const MapInterface = () => {
           'raster-brightness-min': 0.1, // Enhance brightness
           'raster-saturation': 1.2 // Boost saturation for visibility
         }
-      });
+      }, beforeId); // Insert before labels or at the top if no labels found
       
       // Set metadata from the datasets API response
       setDatasetMetadata({
