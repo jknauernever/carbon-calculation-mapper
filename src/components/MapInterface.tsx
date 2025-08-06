@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Search, Square, RotateCcw, ChevronLeft, ChevronRight, TrendingUp, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { GEELayerToggle } from "./GEELayerToggle";
+import { DatasetSelector } from "./DatasetSelector";
 import { CarbonResults } from "./CarbonResults";
 import { GEEDataVisualization } from "./GEEDataVisualization";
 import { NDVITimeSeriesPanel } from "./NDVITimeSeriesPanel";
@@ -20,6 +21,14 @@ interface CarbonCalculation {
   soil_organic_carbon: number;
   calculation_method: string;
   data_sources?: any;
+}
+
+interface Dataset {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  parameters?: Record<string, any>;
 }
 
 export const MapInterface = () => {
@@ -40,6 +49,7 @@ export const MapInterface = () => {
   const [activeLayers, setActiveLayers] = useState<Record<string, { enabled: boolean; opacity: number }>>({});
   const [clickedCoordinates, setClickedCoordinates] = useState<[number, number] | null>(null);
   const [activePanel, setActivePanel] = useState<'carbon' | 'ndvi'>('carbon');
+  const [selectedDataset, setSelectedDataset] = useState<Dataset | null>(null);
 
   // Initialize map with Mapbox token from Supabase
   useEffect(() => {
@@ -284,6 +294,15 @@ export const MapInterface = () => {
     toast.success(`Searching for: ${searchAddress}`);
   };
 
+  const handleDatasetSelect = (dataset: Dataset) => {
+    setSelectedDataset(dataset);
+    console.log('Selected dataset:', dataset);
+    toast.success(`Dataset selected: ${dataset.name}`);
+    
+    // TODO: Update tile requests with selected dataset parameter
+    // This will be used when integrating with your Vercel tile API
+  };
+
 
 
 
@@ -349,8 +368,14 @@ export const MapInterface = () => {
         {!sidebarCollapsed && (
           <div className="flex-1 overflow-y-auto p-4">
             {activePanel === 'carbon' && (
-              <div className="text-center p-4 text-muted-foreground">
-                <p>Data layers will be integrated with your Vercel tile API service.</p>
+              <div className="space-y-4">
+                <DatasetSelector 
+                  onDatasetSelect={handleDatasetSelect}
+                  selectedDataset={selectedDataset}
+                />
+                <div className="text-center p-4 text-muted-foreground">
+                  <p>Map layers will be integrated with your Vercel tile API service.</p>
+                </div>
               </div>
             )}
             
