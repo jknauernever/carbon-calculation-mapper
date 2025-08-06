@@ -611,7 +611,9 @@ export const MapInterface = () => {
 
       console.log('Tile URL template received:', data.tileUrl);
       
-      // Add tile source with the secure tile URL
+      // Add tile source with the secure tile URL and debugging
+      console.log('Adding tile source with URL:', data.tileUrl);
+      
       map.current.addSource(sourceId, {
         type: 'raster',
         tiles: [data.tileUrl],
@@ -630,13 +632,21 @@ export const MapInterface = () => {
         source: sourceId,
         paint: {
           'raster-opacity': opacity,
-          'raster-fade-duration': 300,
-          'raster-contrast': 0.5, // Increased contrast for maximum visibility
-          'raster-brightness-min': 0.0, // Ensure full brightness range
+          'raster-fade-duration': 0, // Remove fade for immediate visibility
+          'raster-contrast': 1.0, // Maximum contrast
+          'raster-brightness-min': 0.0,
           'raster-brightness-max': 1.0,
-          'raster-saturation': 2.0 // Maximum saturation for visibility
+          'raster-saturation': 3.0 // Extreme saturation for debugging
         }
       }); // No beforeId - places on top layer
+      
+      // Debug: Check if layer was added
+      setTimeout(() => {
+        const layer = map.current?.getLayer(layerId);
+        const source = map.current?.getSource(sourceId);
+        console.log('Layer check:', { layer: !!layer, source: !!source });
+        console.log('Map layers:', map.current?.getStyle().layers.map(l => l.id));
+      }, 1000);
       
       // Add to active datasets
       setActiveDatasets(prev => ({
