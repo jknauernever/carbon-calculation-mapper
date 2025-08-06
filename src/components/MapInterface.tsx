@@ -385,38 +385,60 @@ export const MapInterface = () => {
   const clearAllDrawingElements = useCallback(() => {
     if (!map.current) return;
     
-    console.log('🧹 Clearing all drawing elements');
+    console.log('🧹 Clearing all drawing elements - COMPREHENSIVE CLEAR');
+    
+    // Get all layers and sources to see what exists
+    const style = map.current.getStyle();
+    console.log('Current map layers:', style.layers?.map(l => l.id) || 'none');
+    console.log('Current map sources:', Object.keys(style.sources || {}));
     
     // Clear drawing markers
     clearDrawingMarkers();
     
-    // Clear preview polygon
-    const previewLayers = ['polygon-preview-fill', 'polygon-preview-outline'];
-    previewLayers.forEach(layerId => {
+    // Clear ALL possible polygon-related layers and sources
+    const allPossibleLayers = [
+      'polygon-preview-fill',
+      'polygon-preview-outline', 
+      'selected-area-fill',
+      'selected-area-outline',
+      'drawing-preview-fill',
+      'drawing-preview-outline',
+      'area-preview-fill',
+      'area-preview-outline'
+    ];
+    
+    const allPossibleSources = [
+      'polygon-preview',
+      'selected-area', 
+      'drawing-preview',
+      'area-preview'
+    ];
+    
+    // Remove all possible layers
+    allPossibleLayers.forEach(layerId => {
       if (map.current?.getLayer(layerId)) {
-        console.log('Removing preview layer:', layerId);
+        console.log('🗑️ Removing layer:', layerId);
         map.current.removeLayer(layerId);
       }
     });
-    if (map.current.getSource('polygon-preview')) {
-      console.log('Removing preview source');
-      map.current.removeSource('polygon-preview');
-    }
     
-    // Clear completed polygon
-    const polygonLayers = ['selected-area-fill', 'selected-area-outline'];
-    polygonLayers.forEach(layerId => {
-      if (map.current?.getLayer(layerId)) {
-        console.log('Removing completed polygon layer:', layerId);
-        map.current.removeLayer(layerId);
+    // Remove all possible sources
+    allPossibleSources.forEach(sourceId => {
+      if (map.current?.getSource(sourceId)) {
+        console.log('🗑️ Removing source:', sourceId);
+        map.current.removeSource(sourceId);
       }
     });
-    if (map.current.getSource('selected-area')) {
-      console.log('Removing completed polygon source');
-      map.current.removeSource('selected-area');
-    }
     
-    console.log('✅ All drawing elements cleared');
+    // Double-check what's left
+    const remainingStyle = map.current.getStyle();
+    const remainingLayers = remainingStyle.layers?.map(l => l.id) || [];
+    const remainingSources = Object.keys(remainingStyle.sources || {});
+    
+    console.log('Remaining layers after clear:', remainingLayers);
+    console.log('Remaining sources after clear:', remainingSources);
+    
+    console.log('✅ All drawing elements cleared (hopefully!)');
   }, [clearDrawingMarkers]);
 
   const cancelDrawing = useCallback(() => {
@@ -499,23 +521,31 @@ export const MapInterface = () => {
   }, [addMapEventListeners, isMapLoaded, drawingMode]);
 
   const startDrawing = () => {
-    console.log('🎯 Starting drawing mode');
+    console.log('🎯 Starting drawing mode - DEBUGGING VERSION');
+    
+    // Show current state before clearing
+    console.log('Current state before clearing:', {
+      drawingMode,
+      coordinates: coordinates.length,
+      selectedArea: selectedArea ? 'exists' : 'null',
+      carbonCalculation: carbonCalculation ? 'exists' : 'null'
+    });
     
     // Force clear everything first with explicit marker clearing
-    console.log('🧹 Force clearing before starting new drawing');
-    clearDrawingMarkers(); // Clear markers first
-    clearAllDrawingElements(); // Then clear polygons
+    console.log('🧹 FORCE CLEARING EVERYTHING NOW');
+    clearDrawingMarkers();
+    clearAllDrawingElements();
     
     // Ensure we start with completely clean state
     setCoordinates([]);
     setSelectedArea(null);
     setCarbonCalculation(null);
     
-    // Small delay to ensure clearing is complete before starting
-    setTimeout(() => {
-      setDrawingMode(true);
-      toast.info('Click points on the map to draw a polygon. Results update with each point (3+ required).');
-    }, 100);
+    console.log('State after clearing, before starting drawing mode');
+    
+    // Immediate state change - no delay
+    setDrawingMode(true);
+    toast.info('Drawing mode started - map should be completely clear!');
   };
 
   const calculateCarbonForArea = async () => {
