@@ -574,9 +574,6 @@ export const MapInterface = () => {
   };
 
   const handleDatasetSelect = async (dataset: Dataset) => {
-    // Use alerts to bypass console flood
-    alert('🎯 Dataset selection started: ' + dataset.name);
-    
     console.group('🎯 DATASET SELECTION DEBUG');
     console.log('📊 Current state:', {
       mapExists: !!map.current,
