@@ -114,7 +114,17 @@ export const MapInterface = () => {
 
       map.current = new mapboxgl.Map({
         container: mapContainer.current,
-        style: getMapStyle(selectedBaseMap),
+        style: 'data:application/json;base64,' + btoa(JSON.stringify({
+          version: 8,
+          sources: {},
+          layers: [{
+            id: 'background',
+            type: 'background',
+            paint: {
+              'background-color': '#ffffff'
+            }
+          }]
+        })),
         center: [0, 0],
         zoom: 2,
         projection: 'mercator',
