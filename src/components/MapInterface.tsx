@@ -11,6 +11,7 @@ import { DatasetSelector } from "./DatasetSelector";
 import { CarbonResults } from "./CarbonResults";
 import { BaseMapSelector } from "./BaseMapSelector";
 import { GEEDataVisualization } from "./GEEDataVisualization";
+import { CarbonMethodologyInfo } from "./CarbonMethodologyInfo";
 
 
 import { supabase } from "@/integrations/supabase/client";
@@ -41,7 +42,8 @@ export const MapInterface = () => {
   const [coordinates, setCoordinates] = useState<Array<[number, number]>>([]);
   const [selectedArea, setSelectedArea] = useState<{
     coordinates: Array<[number, number]>;
-    area: number;
+    areaHectares: number;
+    areaAcres: number;
   } | null>(null);
   const [carbonCalculation, setCarbonCalculation] = useState<CarbonCalculation | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
@@ -226,7 +228,7 @@ export const MapInterface = () => {
   };
 
   // Helper functions first (no dependencies)
-  const calculatePolygonArea = (coords: Array<[number, number]>): number => {
+  const calculatePolygonArea = (coords: Array<[number, number]>): { hectares: number; acres: number } => {
     // Simple area calculation using shoelace formula (approximate)
     let area = 0;
     for (let i = 0; i < coords.length; i++) {
@@ -234,10 +236,12 @@ export const MapInterface = () => {
       area += coords[i][0] * coords[j][1];
       area -= coords[j][0] * coords[i][1];
     }
-    return Math.abs(area) / 2 * 111000 * 111000 / 10000; // Convert to hectares (approximate)
+    const hectares = Math.abs(area) / 2 * 111000 * 111000 / 10000; // Convert to hectares (approximate)
+    const acres = hectares * 2.47105; // Convert hectares to acres
+    return { hectares, acres };
   };
 
-  const calculateCarbonForSelectedArea = async (area: { coordinates: Array<[number, number]>; area: number }) => {
+  const calculateCarbonForSelectedArea = async (area: { coordinates: Array<[number, number]>; areaHectares: number; areaAcres: number }) => {
     setIsCalculating(true);
     try {
       const { data, error } = await supabase.functions.invoke('calculate-carbon-gee', {
@@ -246,13 +250,13 @@ export const MapInterface = () => {
             type: 'Polygon',
             coordinates: [area.coordinates]
           },
-          areaHectares: area.area,
+          areaHectares: area.areaHectares,
         },
       });
 
       if (error) throw error;
 
-      if (data.success) {
+      if (data.carbonData) {
         setCarbonCalculation(data.carbonData);
         toast.success('Carbon calculation completed!');
       } else {
@@ -472,10 +476,15 @@ export const MapInterface = () => {
       console.log('🔷 Showing polygon preview and calculating for', newCoordinates.length, 'points');
       showPolygonPreview(newCoordinates);
       // Calculate area and trigger carbon calculation dynamically
-      const area = calculatePolygonArea(newCoordinates);
-      setSelectedArea({ coordinates: newCoordinates, area });
+      const areaCalculation = calculatePolygonArea(newCoordinates);
+      const areaData = { 
+        coordinates: newCoordinates, 
+        areaHectares: areaCalculation.hectares,
+        areaAcres: areaCalculation.acres
+      };
+      setSelectedArea(areaData);
       // Auto-calculate carbon for the current polygon
-      calculateCarbonForSelectedArea({ coordinates: newCoordinates, area });
+      calculateCarbonForSelectedArea(areaData);
     }
   }, [drawingMode, coordinates, addPointMarker, showPolygonPreview]);
 
@@ -851,9 +860,12 @@ export const MapInterface = () => {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div>
+                      <div className="space-y-2">
                         <p className="text-sm text-muted-foreground">Area</p>
-                        <p className="text-lg font-semibold">{selectedArea.area.toFixed(2)} hectares</p>
+                        <div className="space-y-1">
+                          <p className="text-lg font-semibold">{selectedArea.areaHectares.toFixed(2)} hectares</p>
+                          <p className="text-sm text-muted-foreground">{selectedArea.areaAcres.toFixed(2)} acres</p>
+                        </div>
                         <p className="text-xs text-muted-foreground">Points: {selectedArea.coordinates.length}</p>
                       </div>
 
@@ -865,7 +877,10 @@ export const MapInterface = () => {
                       ) : carbonCalculation ? (
                         <div className="space-y-4">
                           <div className="space-y-2">
-                            <h3 className="text-sm font-semibold">Carbon Storage Results</h3>
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-sm font-semibold">Carbon Storage Results</h3>
+                              <CarbonMethodologyInfo />
+                            </div>
                             <div className="grid grid-cols-1 gap-3 text-sm">
                               <div className="bg-muted/50 p-2 rounded">
                                 <span className="text-muted-foreground">Total CO₂e:</span>

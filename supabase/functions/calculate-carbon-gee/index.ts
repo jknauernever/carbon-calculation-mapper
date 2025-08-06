@@ -37,58 +37,25 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { geometry, areaHectares, propertyId } = await req.json();
+    const { geometry, areaHectares } = await req.json();
 
     // Handle carbon calculation requests (geometry required)
     if (!geometry || !areaHectares) {
       throw new Error('Missing required parameters: geometry and areaHectares');
     }
 
-    console.log('Processing carbon calculation for area:', areaHectares, 'hectares');
-    if (propertyId) {
-      console.log('Associated with property ID:', propertyId);
-    } else {
-      console.log('Direct polygon calculation (no property association)');
-    }
+    console.log('Processing direct polygon carbon calculation for area:', areaHectares, 'hectares');
 
     // Calculate carbon using live GEE data
     const geeData = await calculateCarbonWithLiveGEE(geometry, areaHectares);
     console.log('GEE calculation completed:', geeData);
 
-    // Store calculation in database only if propertyId is provided
-    let calculation = null;
-    if (propertyId) {
-      const { data: calculation_data, error: dbError } = await supabase
-        .from('carbon_calculations')
-        .insert([{
-          property_id: propertyId,
-          total_co2e: geeData.total_co2e,
-          above_ground_biomass: geeData.above_ground_biomass,
-          below_ground_biomass: geeData.below_ground_biomass,
-          soil_organic_carbon: geeData.soil_organic_carbon,
-          calculation_method: geeData.calculation_method,
-          data_sources: geeData.data_sources,
-        }])
-        .select()
-        .single();
-
-      if (dbError) {
-        console.error('Database error:', dbError);
-        throw dbError;
-      }
-      
-      calculation = calculation_data;
-      console.log('Results stored in database with ID:', calculation.id);
-    } else {
-      console.log('Skipping database storage - no property ID provided');
-    }
+    // No database storage for direct polygon calculations
 
     return new Response(
       JSON.stringify({
         success: true,
-        carbonData: geeData,
-        calculation: calculation,
-        geeMetadata: geeData.data_sources
+        carbonData: geeData
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
