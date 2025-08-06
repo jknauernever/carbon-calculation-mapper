@@ -320,11 +320,73 @@ export const MapInterface = () => {
     }
   }, []);
 
+  const showPolygonPreview = useCallback((coords: Array<[number, number]>) => {
+    if (!map.current || coords.length < 3) return;
+
+    // Close the polygon for preview
+    const closedCoords = [...coords, coords[0]];
+
+    const polygonGeoJSON = {
+      type: 'Feature' as const,
+      properties: {},
+      geometry: {
+        type: 'Polygon' as const,
+        coordinates: [closedCoords]
+      }
+    };
+
+    // Remove existing preview layers
+    if (map.current.getLayer('polygon-preview-fill')) {
+      map.current.removeLayer('polygon-preview-fill');
+    }
+    if (map.current.getLayer('polygon-preview-outline')) {
+      map.current.removeLayer('polygon-preview-outline');
+    }
+    if (map.current.getSource('polygon-preview')) {
+      map.current.removeSource('polygon-preview');
+    }
+
+    // Add preview polygon with different styling
+    map.current.addSource('polygon-preview', {
+      type: 'geojson',
+      data: polygonGeoJSON
+    });
+
+    map.current.addLayer({
+      id: 'polygon-preview-fill',
+      type: 'fill',
+      source: 'polygon-preview',
+      paint: {
+        'fill-color': '#3b82f6',
+        'fill-opacity': 0.2
+      }
+    });
+
+    map.current.addLayer({
+      id: 'polygon-preview-outline',
+      type: 'line',
+      source: 'polygon-preview',
+      paint: {
+        'line-color': '#3b82f6',
+        'line-width': 2,
+        'line-dasharray': [2, 2] // Dashed line for preview
+      }
+    });
+  }, []);
+
   const completePolygonAndCalculate = useCallback(async (coords: Array<[number, number]>) => {
     if (!map.current) return;
 
-    // Keep the point markers visible - don't clear them
-    // clearDrawingMarkers();
+    // Remove the preview polygon
+    if (map.current.getLayer('polygon-preview-fill')) {
+      map.current.removeLayer('polygon-preview-fill');
+    }
+    if (map.current.getLayer('polygon-preview-outline')) {
+      map.current.removeLayer('polygon-preview-outline');
+    }
+    if (map.current.getSource('polygon-preview')) {
+      map.current.removeSource('polygon-preview');
+    }
 
     // Close the polygon
     const closedCoords = [...coords, coords[0]];
@@ -384,6 +446,46 @@ export const MapInterface = () => {
     // Automatically start carbon calculation
     toast.success(`Area drawn: ${area.toFixed(2)} hectares. Starting carbon calculation...`);
     await calculateCarbonForSelectedArea({ coordinates: coords, area });
+  }, []);
+
+  const finishDrawing = useCallback(() => {
+    if (coordinates.length >= 3) {
+      console.log('🔥 Finishing polygon with', coordinates.length, 'points');
+      completePolygonAndCalculate(coordinates);
+    } else {
+      toast.error('Need at least 3 points to create a polygon');
+    }
+  }, [coordinates, completePolygonAndCalculate]);
+
+  const clearAllDrawingElements = useCallback(() => {
+    if (!map.current) return;
+    
+    console.log('🧹 Clearing all drawing elements');
+    
+    // Clear drawing markers
+    clearDrawingMarkers();
+    
+    // Clear preview polygon
+    const previewLayers = ['polygon-preview-fill', 'polygon-preview-outline'];
+    previewLayers.forEach(layerId => {
+      if (map.current?.getLayer(layerId)) {
+        map.current.removeLayer(layerId);
+      }
+    });
+    if (map.current.getSource('polygon-preview')) {
+      map.current.removeSource('polygon-preview');
+    }
+    
+    // Clear completed polygon
+    const polygonLayers = ['selected-area-fill', 'selected-area-outline'];
+    polygonLayers.forEach(layerId => {
+      if (map.current?.getLayer(layerId)) {
+        map.current.removeLayer(layerId);
+      }
+    });
+    if (map.current.getSource('selected-area')) {
+      map.current.removeSource('selected-area');
+    }
   }, [clearDrawingMarkers]);
 
   const cancelDrawing = useCallback(() => {
@@ -410,12 +512,12 @@ export const MapInterface = () => {
     // Add visual marker for the clicked point
     addPointMarker(lng, lat, newCoordinates.length);
 
-    // Auto-complete polygon and calculate carbon when we have 3+ points
+    // Show preview polygon if we have 3+ points, but don't auto-complete
     if (newCoordinates.length >= 3) {
-      console.log('🔥 Auto-completing polygon with', newCoordinates.length, 'points');
-      completePolygonAndCalculate(newCoordinates);
+      console.log('🔷 Showing polygon preview with', newCoordinates.length, 'points');
+      showPolygonPreview(newCoordinates);
     }
-  }, [drawingMode, coordinates, addPointMarker, completePolygonAndCalculate]);
+  }, [drawingMode, coordinates, addPointMarker, showPolygonPreview]);
 
   const addMapEventListeners = useCallback(() => {
     console.log('🔧 addMapEventListeners called');
@@ -426,12 +528,14 @@ export const MapInterface = () => {
 
     console.log('📍 Current drawing mode:', drawingMode);
     
-    // Remove existing listener first
+    // Remove existing listeners first
     map.current.off('click', handleMapClick);
+    map.current.off('dblclick', finishDrawing);
     
-    // Add fresh listener with current state
+    // Add fresh listeners with current state
     map.current.on('click', handleMapClick);
-    console.log('✅ Map click event listener attached/updated');
+    map.current.on('dblclick', finishDrawing);
+    console.log('✅ Map click and double-click event listeners attached/updated');
     
     // Add keyboard event listeners
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -447,7 +551,7 @@ export const MapInterface = () => {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [handleMapClick, drawingMode, cancelDrawing]);
+  }, [handleMapClick, finishDrawing, drawingMode, cancelDrawing]);
 
   // Re-attach event listeners when drawing state changes
   useEffect(() => {
@@ -462,9 +566,9 @@ export const MapInterface = () => {
     console.log('🎯 Starting drawing mode');
     setDrawingMode(true);
     setCoordinates([]);
-    // Don't clear map here as it removes event listeners
-    // clearMap();
-    toast.info('Click 3+ points on the map to draw an area. Auto-completes at 3 points.');
+    // Clear any existing polygons and markers
+    clearAllDrawingElements();
+    toast.info('Click points on the map to draw a polygon. Double-click or press "Finish" when done.');
   };
 
   const calculateCarbonForArea = async () => {
@@ -475,14 +579,16 @@ export const MapInterface = () => {
   const clearMap = () => {
     if (!map.current) return;
 
+    console.log('🧹 Clearing entire map');
+    
     // Clear drawing state
     setDrawingMode(false);
     setCoordinates([]);
     setSelectedArea(null);
     setCarbonCalculation(null);
 
-    // Clear drawing markers when clearing the entire map
-    clearDrawingMarkers();
+    // Clear all drawing elements
+    clearAllDrawingElements();
 
     // Remove map layers
     const layersToRemove = ['selected-area-fill', 'selected-area-outline'];
@@ -797,12 +903,18 @@ export const MapInterface = () => {
               />
               <Button
                 variant={drawingMode ? "default" : "outline"}
-                onClick={drawingMode ? cancelDrawing : startDrawing}
+                onClick={drawingMode ? finishDrawing : startDrawing}
+                disabled={drawingMode && coordinates.length < 3}
                 size="sm"
               >
                 <Square className="w-4 h-4 mr-2" />
-                {drawingMode ? 'Cancel Drawing' : 'Draw Area (3+ points)'}
+                {drawingMode ? `Finish Drawing (${coordinates.length} points)` : 'Draw Area'}
               </Button>
+              {drawingMode && (
+                <Button variant="outline" onClick={cancelDrawing} size="sm">
+                  Cancel
+                </Button>
+              )}
               <Button variant="outline" onClick={clearMap} size="sm">
                 <RotateCcw className="w-4 h-4 mr-2" />
                 Clear
@@ -834,11 +946,11 @@ export const MapInterface = () => {
           {drawingMode && (
             <div className="absolute top-4 left-4 bg-card p-3 rounded-lg shadow-lg border border-border">
               <p className="text-sm text-foreground">
-                Drawing mode active. Points: {coordinates.length}/3
-                {coordinates.length >= 3 ? ' (Will auto-complete next click)' : ` (Need ${3 - coordinates.length} more)`}
+                Drawing mode active. Points: {coordinates.length}
+                {coordinates.length >= 3 ? ' (Ready to finish)' : ` (Need ${Math.max(0, 3 - coordinates.length)} more)`}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                ESC to cancel • Auto-completes at 3 points
+                Double-click to finish • ESC to cancel • Click "Finish Drawing" button
               </p>
             </div>
           )}
