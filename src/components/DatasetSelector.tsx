@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, ChevronRight, Database, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Database, Loader2, Minimize2, Maximize2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -28,6 +28,7 @@ export const DatasetSelector: React.FC<DatasetSelectorProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   useEffect(() => {
     fetchDatasets();
@@ -149,17 +150,32 @@ export const DatasetSelector: React.FC<DatasetSelectorProps> = ({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Database className="h-5 w-5" />
-          Dataset Selector
-        </CardTitle>
-        {selectedDataset && (
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Database className="h-5 w-5" />
+            Dataset Selector
+          </CardTitle>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="h-8 w-8 p-0"
+          >
+            {isCollapsed ? (
+              <Maximize2 className="h-4 w-4" />
+            ) : (
+              <Minimize2 className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+        {selectedDataset && !isCollapsed && (
           <Badge variant="secondary" className="w-fit">
             Selected: {selectedDataset.name}
           </Badge>
         )}
       </CardHeader>
-      <CardContent className="space-y-2">
+      {!isCollapsed && (
+        <CardContent className="space-y-2">
         {Object.entries(groupedDatasets).length === 0 ? (
           <div className="text-center py-4 text-muted-foreground">
             No datasets available
@@ -226,7 +242,8 @@ export const DatasetSelector: React.FC<DatasetSelectorProps> = ({
             </Button>
           </div>
         )}
-      </CardContent>
+        </CardContent>
+      )}
     </Card>
   );
 };
