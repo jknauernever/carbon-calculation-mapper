@@ -411,6 +411,8 @@ export const MapInterface = () => {
     console.log('❌ Cancelling drawing mode');
     setDrawingMode(false);
     setCoordinates([]);
+    setSelectedArea(null);
+    setCarbonCalculation(null);
     clearDrawingMarkers();
     toast.info('Drawing cancelled');
   }, [clearDrawingMarkers]);
@@ -486,10 +488,16 @@ export const MapInterface = () => {
 
   const startDrawing = () => {
     console.log('🎯 Starting drawing mode');
-    setDrawingMode(true);
+    
+    // Ensure we start with completely clean state
     setCoordinates([]);
+    setSelectedArea(null);
+    setCarbonCalculation(null);
+    
     // Clear any existing polygons and markers
     clearAllDrawingElements();
+    
+    setDrawingMode(true);
     toast.info('Click points on the map to draw a polygon. Results update with each point (3+ required).');
   };
 
@@ -503,7 +511,7 @@ export const MapInterface = () => {
 
     console.log('🧹 Clearing entire map');
     
-    // Clear drawing state
+    // Clear drawing state completely
     setDrawingMode(false);
     setCoordinates([]);
     setSelectedArea(null);
@@ -512,25 +520,16 @@ export const MapInterface = () => {
     // Clear all drawing elements
     clearAllDrawingElements();
 
-    // Remove map layers
-    const layersToRemove = ['selected-area-fill', 'selected-area-outline'];
-    layersToRemove.forEach(layerId => {
-      if (map.current?.getLayer(layerId)) {
-        map.current.removeLayer(layerId);
-      }
-    });
-
-    if (map.current.getSource('selected-area')) {
-      map.current.removeSource('selected-area');
-    }
-
     // Clear dataset layers
     clearDatasetLayers();
     setSelectedDataset(null);
     setDatasetMetadata(null);
     
     setActiveLayers({});
+    
+    toast.info('Map cleared');
   };
+
 
   const handleAddressSearch = async () => {
     if (!searchAddress.trim()) return;
