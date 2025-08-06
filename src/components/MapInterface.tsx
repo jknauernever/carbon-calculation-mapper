@@ -323,8 +323,8 @@ export const MapInterface = () => {
   const completePolygonAndCalculate = useCallback(async (coords: Array<[number, number]>) => {
     if (!map.current) return;
 
-    // Clear any existing markers
-    clearDrawingMarkers();
+    // Keep the point markers visible - don't clear them
+    // clearDrawingMarkers();
 
     // Close the polygon
     const closedCoords = [...coords, coords[0]];
@@ -481,7 +481,7 @@ export const MapInterface = () => {
     setSelectedArea(null);
     setCarbonCalculation(null);
 
-    // Clear drawing markers
+    // Clear drawing markers when clearing the entire map
     clearDrawingMarkers();
 
     // Remove map layers
