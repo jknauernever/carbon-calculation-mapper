@@ -83,14 +83,19 @@ export const MapInterface = () => {
   }, []);
 
   const initializeMap = useCallback((token?: string) => {
-    if (!mapContainer.current || map.current) return;
-
-    const mapboxAccessToken = token || mapboxToken;
-    if (!mapboxAccessToken) {
-      console.error('No Mapbox token available');
+    console.log('🚀 initializeMap called');
+    if (!mapContainer.current || map.current) {
+      console.log('❌ Map container not ready or map already exists');
       return;
     }
 
+    const mapboxAccessToken = token || mapboxToken;
+    if (!mapboxAccessToken) {
+      console.error('❌ No Mapbox token available');
+      return;
+    }
+
+    console.log('🗺️ Initializing Mapbox map...');
     mapboxgl.accessToken = mapboxAccessToken;
 
     map.current = new mapboxgl.Map({
@@ -101,20 +106,25 @@ export const MapInterface = () => {
       projection: 'mercator'
     });
 
+    console.log('🎮 Adding map controls...');
     map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
     map.current.addControl(new mapboxgl.ScaleControl(), 'bottom-left');
 
     map.current.on('load', () => {
-      console.log('🗺️ Map loaded, setting up event listeners');
+      console.log('🗺️ Map loaded successfully');
       setIsMapLoaded(true);
+      console.log('🔧 About to add map event listeners...');
       addMapEventListeners();
+      console.log('✅ Map initialization complete');
     });
 
     map.current.on('error', (e) => {
-      console.error('Map error:', e);
+      console.error('❌ Map error:', e);
       toast.error('Map failed to load properly');
     });
-  }, [mapboxToken]);
+
+    console.log('✅ Map setup complete');
+  }, [mapboxToken, selectedBaseMap]);
 
   // Handle map resize when sidebar toggles or window resizes
   useEffect(() => {
@@ -408,17 +418,24 @@ export const MapInterface = () => {
   }, [drawingMode, coordinates, addPointMarker, completePolygonAndCalculate]);
 
   const addMapEventListeners = useCallback(() => {
-    if (!map.current) return;
+    console.log('🔧 addMapEventListeners called');
+    if (!map.current) {
+      console.log('❌ No map.current available');
+      return;
+    }
 
+    console.log('📍 Current drawing mode:', drawingMode);
+    
     // Remove existing listener first
     map.current.off('click', handleMapClick);
     
     // Add fresh listener with current state
     map.current.on('click', handleMapClick);
-    console.log('🔧 Map click event listener attached/updated');
+    console.log('✅ Map click event listener attached/updated');
     
     // Add keyboard event listeners
     const handleKeyDown = (e: KeyboardEvent) => {
+      console.log('⌨️ Key pressed:', e.key, 'Drawing mode:', drawingMode);
       if (e.key === 'Escape' && drawingMode) {
         cancelDrawing();
       }
@@ -434,17 +451,19 @@ export const MapInterface = () => {
 
   // Re-attach event listeners when drawing state changes
   useEffect(() => {
+    console.log('🔄 useEffect triggered - isMapLoaded:', isMapLoaded, 'drawingMode:', drawingMode);
     if (isMapLoaded && map.current) {
       console.log('🔄 Updating event listeners due to state change');
       addMapEventListeners();
     }
-  }, [addMapEventListeners, isMapLoaded]);
+  }, [addMapEventListeners, isMapLoaded, drawingMode]);
 
   const startDrawing = () => {
     console.log('🎯 Starting drawing mode');
     setDrawingMode(true);
     setCoordinates([]);
-    clearMap();
+    // Don't clear map here as it removes event listeners
+    // clearMap();
     toast.info('Click 3+ points on the map to draw an area. Auto-completes at 3 points.');
   };
 
