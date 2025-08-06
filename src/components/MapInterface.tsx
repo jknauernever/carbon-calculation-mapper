@@ -721,10 +721,20 @@ export const MapInterface = () => {
         type: 'raster',
         source: sourceId,
         paint: {
-          'raster-opacity': opacity,
+          'raster-opacity': 1.0, // Always full opacity
           'raster-fade-duration': 300
         }
       }, beforeId);
+      
+      // Debug: Check if layer was added successfully
+      setTimeout(() => {
+        if (map.current?.getLayer(layerId)) {
+          console.log('✅ Layer confirmed visible:', layerId);
+          console.log('🎨 Layer paint properties:', map.current.getPaintProperty(layerId, 'raster-opacity'));
+        } else {
+          console.error('❌ Layer not found after adding:', layerId);
+        }
+      }, 1000);
       
       // Update state
       setActiveDatasets(prev => ({
