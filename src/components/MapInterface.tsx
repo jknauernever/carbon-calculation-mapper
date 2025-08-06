@@ -105,6 +105,7 @@ export const MapInterface = () => {
     map.current.addControl(new mapboxgl.ScaleControl(), 'bottom-left');
 
     map.current.on('load', () => {
+      console.log('🗺️ Map loaded, setting up event listeners');
       setIsMapLoaded(true);
       addMapEventListeners();
     });
@@ -214,43 +215,48 @@ export const MapInterface = () => {
     }
   };
 
-  const addMapEventListeners = () => {
-    if (!map.current) return;
-
-    map.current.on('click', handleMapClick);
-    
-    // Add keyboard event listeners
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && drawingMode) {
-        cancelDrawing();
-      }
-    };
-    
-    window.addEventListener('keydown', handleKeyDown);
-    
-    // Store cleanup function
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
+  // Helper functions first (no dependencies)
+  const calculatePolygonArea = (coords: Array<[number, number]>): number => {
+    // Simple area calculation using shoelace formula (approximate)
+    let area = 0;
+    for (let i = 0; i < coords.length; i++) {
+      const j = (i + 1) % coords.length;
+      area += coords[i][0] * coords[j][1];
+      area -= coords[j][0] * coords[i][1];
+    }
+    return Math.abs(area) / 2 * 111000 * 111000 / 10000; // Convert to hectares (approximate)
   };
 
-  const handleMapClick = (e: mapboxgl.MapMouseEvent) => {
-    if (!drawingMode) return;
+  const calculateCarbonForSelectedArea = async (area: { coordinates: Array<[number, number]>; area: number }) => {
+    setIsCalculating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('calculate-carbon-gee', {
+        body: {
+          geometry: {
+            type: 'Polygon',
+            coordinates: [area.coordinates]
+          },
+          areaHectares: area.area,
+        },
+      });
 
-    const { lng, lat } = e.lngLat;
-    const newCoordinates = [...coordinates, [lng, lat] as [number, number]];
-    setCoordinates(newCoordinates);
+      if (error) throw error;
 
-    // Add visual marker for the clicked point
-    addPointMarker(lng, lat, newCoordinates.length);
-
-    // Auto-complete polygon and calculate carbon when we have 3+ points
-    if (newCoordinates.length >= 3) {
-      completePolygonAndCalculate(newCoordinates);
+      if (data.success) {
+        setCarbonCalculation(data.carbonData);
+        toast.success('Carbon calculation completed!');
+      } else {
+        throw new Error('Calculation failed');
+      }
+    } catch (error) {
+      console.error('Error calculating carbon:', error);
+      toast.error('Failed to calculate carbon storage');
+    } finally {
+      setIsCalculating(false);
     }
   };
 
-  const addPointMarker = (lng: number, lat: number, pointNumber: number) => {
+  const addPointMarker = useCallback((lng: number, lat: number, pointNumber: number) => {
     if (!map.current) return;
 
     const markerId = `drawing-point-${pointNumber}`;
@@ -287,9 +293,24 @@ export const MapInterface = () => {
         'circle-stroke-color': '#ffffff'
       }
     });
-  };
+  }, []);
 
-  const completePolygonAndCalculate = async (coords: Array<[number, number]>) => {
+  const clearDrawingMarkers = useCallback(() => {
+    if (!map.current) return;
+    
+    // Remove all drawing point markers
+    for (let i = 1; i <= 10; i++) { // Clear up to 10 potential markers
+      const markerId = `drawing-point-${i}`;
+      if (map.current.getLayer(markerId)) {
+        map.current.removeLayer(markerId);
+      }
+      if (map.current.getSource(markerId)) {
+        map.current.removeSource(markerId);
+      }
+    }
+  }, []);
+
+  const completePolygonAndCalculate = useCallback(async (coords: Array<[number, number]>) => {
     if (!map.current) return;
 
     // Clear any existing markers
@@ -353,46 +374,83 @@ export const MapInterface = () => {
     // Automatically start carbon calculation
     toast.success(`Area drawn: ${area.toFixed(2)} hectares. Starting carbon calculation...`);
     await calculateCarbonForSelectedArea({ coordinates: coords, area });
-  };
+  }, [clearDrawingMarkers]);
 
-  const clearDrawingMarkers = () => {
-    if (!map.current) return;
+  const cancelDrawing = useCallback(() => {
+    console.log('❌ Cancelling drawing mode');
+    setDrawingMode(false);
+    setCoordinates([]);
+    clearDrawingMarkers();
+    toast.info('Drawing cancelled');
+  }, [clearDrawingMarkers]);
+
+  const handleMapClick = useCallback((e: mapboxgl.MapMouseEvent) => {
+    console.log('🖱️ Map clicked', { drawingMode, coordinates: coordinates.length, lngLat: e.lngLat });
     
-    // Remove all drawing point markers
-    for (let i = 1; i <= 10; i++) { // Clear up to 10 potential markers
-      const markerId = `drawing-point-${i}`;
-      if (map.current.getLayer(markerId)) {
-        map.current.removeLayer(markerId);
-      }
-      if (map.current.getSource(markerId)) {
-        map.current.removeSource(markerId);
-      }
+    if (!drawingMode) {
+      console.log('❌ Not in drawing mode, ignoring click');
+      return;
     }
-  };
 
-  const calculatePolygonArea = (coords: Array<[number, number]>): number => {
-    // Simple area calculation using shoelace formula (approximate)
-    let area = 0;
-    for (let i = 0; i < coords.length; i++) {
-      const j = (i + 1) % coords.length;
-      area += coords[i][0] * coords[j][1];
-      area -= coords[j][0] * coords[i][1];
+    const { lng, lat } = e.lngLat;
+    const newCoordinates = [...coordinates, [lng, lat] as [number, number]];
+    console.log('📍 Adding new coordinate', { lng, lat, total: newCoordinates.length });
+    setCoordinates(newCoordinates);
+
+    // Add visual marker for the clicked point
+    addPointMarker(lng, lat, newCoordinates.length);
+
+    // Auto-complete polygon and calculate carbon when we have 3+ points
+    if (newCoordinates.length >= 3) {
+      console.log('🔥 Auto-completing polygon with', newCoordinates.length, 'points');
+      completePolygonAndCalculate(newCoordinates);
     }
-    return Math.abs(area) / 2 * 111000 * 111000 / 10000; // Convert to hectares (approximate)
-  };
+  }, [drawingMode, coordinates, addPointMarker, completePolygonAndCalculate]);
+
+  const addMapEventListeners = useCallback(() => {
+    if (!map.current) return;
+
+    // Remove existing listener first
+    map.current.off('click', handleMapClick);
+    
+    // Add fresh listener with current state
+    map.current.on('click', handleMapClick);
+    console.log('🔧 Map click event listener attached/updated');
+    
+    // Add keyboard event listeners
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && drawingMode) {
+        cancelDrawing();
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    
+    // Store cleanup function
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleMapClick, drawingMode, cancelDrawing]);
+
+  // Re-attach event listeners when drawing state changes
+  useEffect(() => {
+    if (isMapLoaded && map.current) {
+      console.log('🔄 Updating event listeners due to state change');
+      addMapEventListeners();
+    }
+  }, [addMapEventListeners, isMapLoaded]);
 
   const startDrawing = () => {
+    console.log('🎯 Starting drawing mode');
     setDrawingMode(true);
     setCoordinates([]);
     clearMap();
     toast.info('Click 3+ points on the map to draw an area. Auto-completes at 3 points.');
   };
 
-  const cancelDrawing = () => {
-    setDrawingMode(false);
-    setCoordinates([]);
-    clearDrawingMarkers();
-    toast.info('Drawing cancelled');
+  const calculateCarbonForArea = async () => {
+    if (!selectedArea) return;
+    await calculateCarbonForSelectedArea(selectedArea);
   };
 
   const clearMap = () => {
@@ -425,41 +483,6 @@ export const MapInterface = () => {
     setDatasetMetadata(null);
     
     setActiveLayers({});
-  };
-
-
-  const calculateCarbonForSelectedArea = async (area: { coordinates: Array<[number, number]>; area: number }) => {
-    setIsCalculating(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('calculate-carbon-gee', {
-        body: {
-          geometry: {
-            type: 'Polygon',
-            coordinates: [area.coordinates]
-          },
-          areaHectares: area.area,
-        },
-      });
-
-      if (error) throw error;
-
-      if (data.success) {
-        setCarbonCalculation(data.carbonData);
-        toast.success('Carbon calculation completed!');
-      } else {
-        throw new Error('Calculation failed');
-      }
-    } catch (error) {
-      console.error('Error calculating carbon:', error);
-      toast.error('Failed to calculate carbon storage');
-    } finally {
-      setIsCalculating(false);
-    }
-  };
-
-  const calculateCarbonForArea = async () => {
-    if (!selectedArea) return;
-    await calculateCarbonForSelectedArea(selectedArea);
   };
 
   const handleAddressSearch = async () => {
