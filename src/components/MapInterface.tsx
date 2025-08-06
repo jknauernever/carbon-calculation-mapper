@@ -574,23 +574,40 @@ export const MapInterface = () => {
   };
 
   const handleDatasetSelect = async (dataset: Dataset) => {
+    // Use alerts to bypass console flood
+    alert('🎯 Dataset selection started: ' + dataset.name);
+    
+    console.group('🎯 DATASET SELECTION DEBUG');
+    console.log('📊 Current state:', {
+      mapExists: !!map.current,
+      isMapLoaded,
+      activeDatasets: Object.keys(activeDatasets),
+      mapboxToken: !!mapboxToken
+    });
+    
     setSelectedDataset(dataset);
     
     // Check if dataset is already active
     if (activeDatasets[dataset.id]) {
+      console.log('⚠️ Dataset already active:', dataset.name);
+      console.groupEnd();
       toast.info(`${dataset.name} is already active`);
       return;
     }
     
+    console.log('✅ About to call addDatasetLayer...');
     toast.success(`Adding dataset: ${dataset.name}`);
     
     try {
       // Add new dataset layer to map
       await addDatasetLayer(dataset, dataset.id, 1.0);
+      console.log('✅ addDatasetLayer completed successfully');
     } catch (error) {
       console.error('❌ addDatasetLayer failed:', error);
-      toast.error(`Failed to add ${dataset.name} layer`);
+      alert('❌ Layer addition failed: ' + error.message);
     }
+    
+    console.groupEnd();
   };
 
   const clearDatasetLayers = () => {
@@ -660,42 +677,23 @@ export const MapInterface = () => {
         throw new Error(`API Error: ${error.message || 'Unknown error'}`);
       }
 
-      if (!data?.tile_url && !data?.tileUrl) {
+      if (!data?.tileUrl) {
         console.error('❌ No tile URL in response:', data);
         throw new Error('No tile URL received - check GEE configuration');
       }
 
-      const tileUrl = data.tile_url || data.tileUrl;
-      console.log('✅ Tile URL received:', tileUrl);
+      console.log('✅ Tile URL received:', data.tileUrl);
       
       // Add tile source
       console.log('🗺️ Adding tile source:', sourceId);
-      console.log('🔍 Tile URL for Mapbox:', tileUrl);
       map.current.addSource(sourceId, {
         type: 'raster',
-        tiles: [tileUrl],
+        tiles: [data.tileUrl],
         tileSize: 256,
         minzoom: 0,
         maxzoom: 15,
         attribution: 'Google Earth Engine'
       });
-      
-      // Test a specific tile to see if it loads
-      const testTileUrl = tileUrl.replace('{z}', '10').replace('{x}', '512').replace('{y}', '256');
-      console.log('🧪 Testing tile URL:', testTileUrl);
-      
-      fetch(testTileUrl)
-        .then(response => {
-          console.log('🧪 Test tile response:', response.status, response.ok);
-          if (response.ok) {
-            console.log('✅ Test tile loaded successfully');
-          } else {
-            console.log('❌ Test tile failed to load');
-          }
-        })
-        .catch(error => {
-          console.error('❌ Test tile error:', error);
-        });
       
       // Find insertion point (before labels)
       let beforeId: string | undefined;
