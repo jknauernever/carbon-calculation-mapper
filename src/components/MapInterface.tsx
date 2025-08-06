@@ -55,7 +55,7 @@ export const MapInterface = () => {
   const [selectedDataset, setSelectedDataset] = useState<Dataset | null>(null);
   const [datasetMetadata, setDatasetMetadata] = useState<any>(null);
   const [tileLoading, setTileLoading] = useState(false);
-  const [selectedBaseMap, setSelectedBaseMap] = useState<string>('satellite');
+  const [selectedBaseMap, setSelectedBaseMap] = useState<string>('none');
 
   // Initialize map with Mapbox token from Supabase
   useEffect(() => {
@@ -186,12 +186,10 @@ export const MapInterface = () => {
     };
   }, [sidebarCollapsed]);
 
-  // Handle base map style changes separately
+  // Handle base map style changes separately - DISABLED
   useEffect(() => {
-    if (map.current && isMapLoaded) {
-      console.log('🎨 Changing base map style to:', selectedBaseMap);
-      map.current.setStyle(getMapStyle(selectedBaseMap));
-    }
+    console.log('🎨 Base map style change disabled - keeping white background');
+    // Disabled to show only NDVI tiles
   }, [selectedBaseMap, isMapLoaded]);
 
   const getMapStyle = (baseMapId: string) => {
