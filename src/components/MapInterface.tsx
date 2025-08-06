@@ -154,7 +154,7 @@ export const MapInterface = () => {
       console.error('❌ Map initialization failed:', error);
       toast.error('Failed to initialize map');
     }
-  }, [mapboxToken, selectedBaseMap]);
+  }, []); // Only run once on mount
 
   // Handle map resize when sidebar toggles or window resizes
   useEffect(() => {
@@ -175,6 +175,14 @@ export const MapInterface = () => {
       clearTimeout(timeoutId);
     };
   }, [sidebarCollapsed]);
+
+  // Handle base map style changes separately
+  useEffect(() => {
+    if (map.current && isMapLoaded) {
+      console.log('🎨 Changing base map style to:', selectedBaseMap);
+      map.current.setStyle(getMapStyle(selectedBaseMap));
+    }
+  }, [selectedBaseMap, isMapLoaded]);
 
   const getMapStyle = (baseMapId: string) => {
     const baseMapOptions: Record<string, string> = {
