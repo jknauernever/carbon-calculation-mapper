@@ -272,10 +272,13 @@ export const MapInterface = () => {
   const updateDrawingLayer = useCallback(() => {
     if (!map.current) return;
 
-    // Remove existing drawing layer
-    if (map.current.getLayer('drawing-layer')) {
-      map.current.removeLayer('drawing-layer');
-    }
+    // Remove existing drawing layers and source
+    const layers = ['drawing-polygon-fill', 'drawing-polygon-outline', 'drawing-points'];
+    layers.forEach(layerId => {
+      if (map.current?.getLayer(layerId)) {
+        map.current.removeLayer(layerId);
+      }
+    });
     if (map.current.getSource('drawing-source')) {
       map.current.removeSource('drawing-source');
     }
