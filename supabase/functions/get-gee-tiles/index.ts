@@ -88,7 +88,7 @@ serve(async (req) => {
     console.log('Getting tile URL from API for:', dataset, year, month);
     
     // Call the main API endpoint to get the tile URL
-    const apiUrl = `https://gee-tile-server.vercel.app/api/tiles?dataset=${dataset}&year=${year}&month=${month}&apikey=${geeApiKey}`;
+    const apiUrl = `https://gee-tile-server-mznkkkyuw-josh-knauers-projects.vercel.app/api/tiles?dataset=${dataset}&year=${year}&month=${month}&apikey=${geeApiKey}`;
     console.log('Calling API:', apiUrl);
     
     try {
