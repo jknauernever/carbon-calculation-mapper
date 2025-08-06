@@ -308,16 +308,22 @@ export const MapInterface = () => {
   const clearDrawingMarkers = useCallback(() => {
     if (!map.current) return;
     
-    // Remove all drawing point markers
-    for (let i = 1; i <= 10; i++) { // Clear up to 10 potential markers
+    console.log('🧹 Clearing drawing markers...');
+    
+    // Remove all drawing point markers - try up to 50 potential markers
+    for (let i = 1; i <= 50; i++) {
       const markerId = `drawing-point-${i}`;
       if (map.current.getLayer(markerId)) {
+        console.log('Removing marker layer:', markerId);
         map.current.removeLayer(markerId);
       }
       if (map.current.getSource(markerId)) {
+        console.log('Removing marker source:', markerId);
         map.current.removeSource(markerId);
       }
     }
+    
+    console.log('✅ Drawing markers cleared');
   }, []);
 
   const showPolygonPreview = useCallback((coords: Array<[number, number]>) => {
@@ -495,9 +501,10 @@ export const MapInterface = () => {
   const startDrawing = () => {
     console.log('🎯 Starting drawing mode');
     
-    // Force clear everything first
+    // Force clear everything first with explicit marker clearing
     console.log('🧹 Force clearing before starting new drawing');
-    clearAllDrawingElements();
+    clearDrawingMarkers(); // Clear markers first
+    clearAllDrawingElements(); // Then clear polygons
     
     // Ensure we start with completely clean state
     setCoordinates([]);
@@ -521,7 +528,8 @@ export const MapInterface = () => {
 
     console.log('🧹 Clearing entire map - FORCE CLEAR');
     
-    // Force clear all visual elements first
+    // Force clear markers first, then other elements
+    clearDrawingMarkers();
     clearAllDrawingElements();
     
     // Clear drawing state completely
@@ -538,7 +546,7 @@ export const MapInterface = () => {
     setActiveLayers({});
     
     console.log('✅ Map completely cleared');
-    toast.info('Map cleared');
+    toast.info('Map cleared - all elements removed');
   };
 
 
