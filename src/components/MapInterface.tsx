@@ -565,7 +565,10 @@ export const MapInterface = () => {
   };
 
   const handleDatasetSelect = async (dataset: Dataset) => {
-    console.log('🎯 Dataset selection started:', dataset.name);
+    // Use alerts to bypass console flood
+    alert('🎯 Dataset selection started: ' + dataset.name);
+    
+    console.group('🎯 DATASET SELECTION DEBUG');
     console.log('📊 Current state:', {
       mapExists: !!map.current,
       isMapLoaded,
@@ -578,15 +581,24 @@ export const MapInterface = () => {
     // Check if dataset is already active
     if (activeDatasets[dataset.id]) {
       console.log('⚠️ Dataset already active:', dataset.name);
+      console.groupEnd();
       toast.info(`${dataset.name} is already active`);
       return;
     }
     
-    console.log('✅ Starting to add dataset layer...');
+    console.log('✅ About to call addDatasetLayer...');
     toast.success(`Adding dataset: ${dataset.name}`);
     
-    // Add new dataset layer to map
-    await addDatasetLayer(dataset, dataset.id, 1.0);
+    try {
+      // Add new dataset layer to map
+      await addDatasetLayer(dataset, dataset.id, 1.0);
+      console.log('✅ addDatasetLayer completed successfully');
+    } catch (error) {
+      console.error('❌ addDatasetLayer failed:', error);
+      alert('❌ Layer addition failed: ' + error.message);
+    }
+    
+    console.groupEnd();
   };
 
   const clearDatasetLayers = () => {
