@@ -900,11 +900,6 @@ export const MapInterface = () => {
                               </div>
                             </div>
                           </div>
-                          {carbonCalculation.data_sources && (
-                            <div className="border-t pt-2">
-                              <GEEDataVisualization carbonCalculation={carbonCalculation} />
-                            </div>
-                          )}
                         </div>
                       ) : (
                         <div className="text-center py-2">
