@@ -343,17 +343,29 @@ export const MapInterface = () => {
       // Clear existing dataset layers first
       clearDatasetLayers();
       
-      // Use the XYZ tile URL format that the API expects
-      // The API requires: dataset, year, month, and apikey parameters
-      // For now using YOUR_API_KEY as placeholder - user needs to provide real key
-      const tileUrl = `https://gee-tile-server.vercel.app/api/tiles/{z}/{x}/{y}?dataset=${dataset.id}&year=2024&month=6&apikey=YOUR_API_KEY`;
+      // Get tile URL template from our secure edge function
+      const { data, error } = await supabase.functions.invoke('get-gee-tiles', {
+        body: {
+          dataset: dataset.id,
+          year: '2024',
+          month: '6'
+        }
+      });
+
+      if (error) {
+        throw new Error(`Edge function error: ${error.message}`);
+      }
+
+      if (!data?.tileUrl) {
+        throw new Error('No tile URL received from edge function');
+      }
+
+      console.log('Tile URL template received:', data.tileUrl);
       
-      console.log('Tile URL pattern:', tileUrl);
-      
-      // Add tile source with proper XYZ format
+      // Add tile source with the secure tile URL
       map.current.addSource('dataset-tiles', {
         type: 'raster',
-        tiles: [tileUrl],
+        tiles: [data.tileUrl],
         tileSize: 256,
         minzoom: 0,
         maxzoom: 18,
