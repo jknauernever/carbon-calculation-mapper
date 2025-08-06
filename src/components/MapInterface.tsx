@@ -374,88 +374,7 @@ export const MapInterface = () => {
     });
   }, []);
 
-  const completePolygonAndCalculate = useCallback(async (coords: Array<[number, number]>) => {
-    if (!map.current) return;
 
-    // Remove the preview polygon
-    if (map.current.getLayer('polygon-preview-fill')) {
-      map.current.removeLayer('polygon-preview-fill');
-    }
-    if (map.current.getLayer('polygon-preview-outline')) {
-      map.current.removeLayer('polygon-preview-outline');
-    }
-    if (map.current.getSource('polygon-preview')) {
-      map.current.removeSource('polygon-preview');
-    }
-
-    // Close the polygon
-    const closedCoords = [...coords, coords[0]];
-
-    const polygonGeoJSON = {
-      type: 'Feature' as const,
-      properties: {},
-      geometry: {
-        type: 'Polygon' as const,
-        coordinates: [closedCoords]
-      }
-    };
-
-    // Remove existing polygon layers
-    if (map.current.getLayer('selected-area-fill')) {
-      map.current.removeLayer('selected-area-fill');
-    }
-    if (map.current.getLayer('selected-area-outline')) {
-      map.current.removeLayer('selected-area-outline');
-    }
-    if (map.current.getSource('selected-area')) {
-      map.current.removeSource('selected-area');
-    }
-
-    // Add new polygon
-    map.current.addSource('selected-area', {
-      type: 'geojson',
-      data: polygonGeoJSON
-    });
-
-    map.current.addLayer({
-      id: 'selected-area-fill',
-      type: 'fill',
-      source: 'selected-area',
-      paint: {
-        'fill-color': '#3b82f6',
-        'fill-opacity': 0.3
-      }
-    });
-
-    map.current.addLayer({
-      id: 'selected-area-outline',
-      type: 'line',
-      source: 'selected-area',
-      paint: {
-        'line-color': '#2563eb',
-        'line-width': 2
-      }
-    });
-
-    // Calculate area
-    const area = calculatePolygonArea(coords);
-    setSelectedArea({ coordinates: coords, area });
-    setDrawingMode(false);
-    setCoordinates([]);
-
-    // Automatically start carbon calculation
-    toast.success(`Area drawn: ${area.toFixed(2)} hectares. Starting carbon calculation...`);
-    await calculateCarbonForSelectedArea({ coordinates: coords, area });
-  }, []);
-
-  const finishDrawing = useCallback(() => {
-    if (coordinates.length >= 3) {
-      console.log('🔥 Finishing polygon with', coordinates.length, 'points');
-      completePolygonAndCalculate(coordinates);
-    } else {
-      toast.error('Need at least 3 points to create a polygon');
-    }
-  }, [coordinates, completePolygonAndCalculate]);
 
   const clearAllDrawingElements = useCallback(() => {
     if (!map.current) return;
@@ -512,10 +431,15 @@ export const MapInterface = () => {
     // Add visual marker for the clicked point
     addPointMarker(lng, lat, newCoordinates.length);
 
-    // Show preview polygon if we have 3+ points, but don't auto-complete
+    // Show preview and calculate dynamically if we have 3+ points
     if (newCoordinates.length >= 3) {
-      console.log('🔷 Showing polygon preview with', newCoordinates.length, 'points');
+      console.log('🔷 Showing polygon preview and calculating for', newCoordinates.length, 'points');
       showPolygonPreview(newCoordinates);
+      // Calculate area and trigger carbon calculation dynamically
+      const area = calculatePolygonArea(newCoordinates);
+      setSelectedArea({ coordinates: newCoordinates, area });
+      // Auto-calculate carbon for the current polygon
+      calculateCarbonForSelectedArea({ coordinates: newCoordinates, area });
     }
   }, [drawingMode, coordinates, addPointMarker, showPolygonPreview]);
 
@@ -530,12 +454,10 @@ export const MapInterface = () => {
     
     // Remove existing listeners first
     map.current.off('click', handleMapClick);
-    map.current.off('dblclick', finishDrawing);
     
     // Add fresh listeners with current state
     map.current.on('click', handleMapClick);
-    map.current.on('dblclick', finishDrawing);
-    console.log('✅ Map click and double-click event listeners attached/updated');
+    console.log('✅ Map click event listener attached/updated');
     
     // Add keyboard event listeners
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -551,7 +473,7 @@ export const MapInterface = () => {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [handleMapClick, finishDrawing, drawingMode, cancelDrawing]);
+  }, [handleMapClick, drawingMode, cancelDrawing]);
 
   // Re-attach event listeners when drawing state changes
   useEffect(() => {
@@ -568,7 +490,7 @@ export const MapInterface = () => {
     setCoordinates([]);
     // Clear any existing polygons and markers
     clearAllDrawingElements();
-    toast.info('Click points on the map to draw a polygon. Double-click or press "Finish" when done.');
+    toast.info('Click points on the map to draw a polygon. Results update with each point (3+ required).');
   };
 
   const calculateCarbonForArea = async () => {
@@ -870,6 +792,67 @@ export const MapInterface = () => {
                     </CardContent>
                   </Card>
                 )}
+
+                {/* Selected Area Results - Moved from right panel */}
+                {selectedArea && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-sm">
+                        <TrendingUp className="h-4 w-4" />
+                        Selected Area
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Area</p>
+                        <p className="text-lg font-semibold">{selectedArea.area.toFixed(2)} hectares</p>
+                        <p className="text-xs text-muted-foreground">Points: {selectedArea.coordinates.length}</p>
+                      </div>
+
+                      {isCalculating ? (
+                        <div className="text-center py-4">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                          <p className="mt-2 text-sm text-muted-foreground">Calculating carbon storage...</p>
+                        </div>
+                      ) : carbonCalculation ? (
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <h3 className="text-sm font-semibold">Carbon Storage Results</h3>
+                            <div className="grid grid-cols-1 gap-3 text-sm">
+                              <div className="bg-muted/50 p-2 rounded">
+                                <span className="text-muted-foreground">Total CO₂e:</span>
+                                <span className="font-semibold ml-2">{carbonCalculation.total_co2e.toFixed(1)} tonnes</span>
+                              </div>
+                              <div className="bg-muted/50 p-2 rounded">
+                                <span className="text-muted-foreground">Biomass:</span>
+                                <span className="font-semibold ml-2">{carbonCalculation.above_ground_biomass.toFixed(1)} tonnes</span>
+                              </div>
+                              <div className="bg-muted/50 p-2 rounded">
+                                <span className="text-muted-foreground">Soil Carbon:</span>
+                                <span className="font-semibold ml-2">{carbonCalculation.soil_organic_carbon.toFixed(1)} tonnes</span>
+                              </div>
+                              <div className="bg-muted/50 p-2 rounded">
+                                <span className="text-muted-foreground">Method:</span>
+                                <span className="font-semibold ml-2 text-xs">{carbonCalculation.calculation_method}</span>
+                              </div>
+                            </div>
+                          </div>
+                          {carbonCalculation.data_sources && (
+                            <div className="border-t pt-2">
+                              <GEEDataVisualization carbonCalculation={carbonCalculation} />
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-center py-2">
+                          <p className="text-sm text-muted-foreground">
+                            {drawingMode ? 'Add more points for calculation' : 'Click "Draw Area" to start'}
+                          </p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
               </div>
           </div>
         )}
@@ -903,18 +886,12 @@ export const MapInterface = () => {
               />
               <Button
                 variant={drawingMode ? "default" : "outline"}
-                onClick={drawingMode ? finishDrawing : startDrawing}
-                disabled={drawingMode && coordinates.length < 3}
+                onClick={drawingMode ? cancelDrawing : startDrawing}
                 size="sm"
               >
                 <Square className="w-4 h-4 mr-2" />
-                {drawingMode ? `Finish Drawing (${coordinates.length} points)` : 'Draw Area'}
+                {drawingMode ? 'Stop Drawing' : 'Draw Area'}
               </Button>
-              {drawingMode && (
-                <Button variant="outline" onClick={cancelDrawing} size="sm">
-                  Cancel
-                </Button>
-              )}
               <Button variant="outline" onClick={clearMap} size="sm">
                 <RotateCcw className="w-4 h-4 mr-2" />
                 Clear
@@ -947,70 +924,16 @@ export const MapInterface = () => {
             <div className="absolute top-4 left-4 bg-card p-3 rounded-lg shadow-lg border border-border">
               <p className="text-sm text-foreground">
                 Drawing mode active. Points: {coordinates.length}
-                {coordinates.length >= 3 ? ' (Ready to finish)' : ` (Need ${Math.max(0, 3 - coordinates.length)} more)`}
+                {coordinates.length >= 3 ? ' (Carbon calculating...)' : ` (Need ${Math.max(0, 3 - coordinates.length)} more for calculation)`}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                Double-click to finish • ESC to cancel • Click "Finish Drawing" button
+                ESC to cancel • Results update with each point
               </p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Right Panel - Selected Area Info */}
-      {selectedArea && (
-        <div className="w-96 bg-card border-l border-border p-4 overflow-y-auto">
-          <Card>
-            <CardHeader>
-              <CardTitle>Selected Area</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Area</p>
-                <p className="text-lg font-semibold">{selectedArea.area.toFixed(2)} hectares</p>
-              </div>
-
-              {isCalculating ? (
-                <div className="text-center py-4">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                  <p className="mt-2 text-sm text-muted-foreground">Calculating carbon storage...</p>
-                </div>
-              ) : carbonCalculation ? (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <h3 className="text-lg font-semibold">Carbon Storage Results</h3>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">Total CO₂e:</span>
-                        <span className="font-semibold ml-2">{carbonCalculation.total_co2e.toFixed(1)} tonnes</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Biomass:</span>
-                        <span className="font-semibold ml-2">{carbonCalculation.above_ground_biomass.toFixed(1)} tonnes</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Soil Carbon:</span>
-                        <span className="font-semibold ml-2">{carbonCalculation.soil_organic_carbon.toFixed(1)} tonnes</span>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Method:</span>
-                        <span className="font-semibold ml-2">{carbonCalculation.calculation_method}</span>
-                      </div>
-                    </div>
-                  </div>
-                  {carbonCalculation.data_sources && (
-                    <GEEDataVisualization carbonCalculation={carbonCalculation} />
-                  )}
-                </div>
-              ) : (
-                <Button onClick={calculateCarbonForArea} className="w-full">
-                  Calculate Carbon Storage
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      )}
     </div>
   );
 };
