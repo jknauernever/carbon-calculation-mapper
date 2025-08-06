@@ -88,8 +88,14 @@ export const MapInterface = () => {
 
   const initializeMap = useCallback((token?: string) => {
     console.log('🚀 initializeMap called');
-    if (!mapContainer.current || map.current) {
-      console.log('❌ Map container not ready or map already exists');
+    
+    if (!mapContainer.current) {
+      console.log('❌ Map container not ready, waiting...');
+      return;
+    }
+    
+    if (map.current) {
+      console.log('🗺️ Map already exists, skipping initialization');
       return;
     }
 
