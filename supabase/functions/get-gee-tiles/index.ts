@@ -85,15 +85,17 @@ serve(async (req) => {
     }
 
     // If no tile coordinates, return tile URL template
-    // Based on the API docs, the correct format should be /api/tiles with query params
-    const tileUrlTemplate = `https://gee-tile-server.vercel.app/api/tiles?dataset=${dataset}&year=${year}&month=${month}&apikey=${geeApiKey}&z={z}&x={x}&y={y}`;
+    // Use the exact format from the API documentation: /api/tiles with {z}/{x}/{y} in the path
+    const tileUrlTemplate = `https://gee-tile-server.vercel.app/api/tiles/{z}/{x}/{y}?dataset=${dataset}&year=${year}&month=${month}&apikey=${geeApiKey}`;
+    
+    console.log('Generated tile URL template:', tileUrlTemplate);
     
     console.log('Generated tile URL template:', tileUrlTemplate);
     console.log('Dataset:', dataset, 'Year:', year, 'Month:', month);
     console.log('API Key present:', !!geeApiKey);
     
     // Test one specific tile URL to validate the format
-    const testUrl = `https://gee-tile-server.vercel.app/api/tiles?dataset=${dataset}&year=${year}&month=${month}&apikey=${geeApiKey}&z=5&x=10&y=12`;
+    const testUrl = `https://gee-tile-server.vercel.app/api/tiles/5/10/12?dataset=${dataset}&year=${year}&month=${month}&apikey=${geeApiKey}`;
     console.log('Test tile URL:', testUrl);
     
     // Try fetching a test tile to validate the endpoint
