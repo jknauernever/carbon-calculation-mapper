@@ -38,8 +38,8 @@ export const MapInterface = () => {
   const map = useRef<mapboxgl.Map | null>(null);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [searchAddress, setSearchAddress] = useState('');
-  const [drawingMode, setDrawingMode] = useState(false);
-  const [coordinates, setCoordinates] = useState<Array<[number, number]>>([]);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [drawingCoords, setDrawingCoords] = useState<Array<[number, number]>>([]);
   const [selectedArea, setSelectedArea] = useState<{
     coordinates: Array<[number, number]>;
     areaHectares: number;
@@ -115,8 +115,6 @@ export const MapInterface = () => {
     map.current.on('load', () => {
       console.log('🗺️ Map loaded successfully');
       setIsMapLoaded(true);
-      console.log('🔧 About to add map event listeners...');
-      addMapEventListeners();
       console.log('✅ Map initialization complete');
     });
 
@@ -270,36 +268,87 @@ export const MapInterface = () => {
     }
   };
 
-  const addPointMarker = useCallback((lng: number, lat: number, pointNumber: number) => {
+  // New simplified drawing functions
+  const updateDrawingLayer = useCallback(() => {
     if (!map.current) return;
 
-    const markerId = `drawing-point-${pointNumber}`;
-    
-    // Remove existing marker if it exists
-    if (map.current.getSource(markerId)) {
-      if (map.current.getLayer(markerId)) {
-        map.current.removeLayer(markerId);
-      }
-      map.current.removeSource(markerId);
+    // Remove existing drawing layer
+    if (map.current.getLayer('drawing-layer')) {
+      map.current.removeLayer('drawing-layer');
+    }
+    if (map.current.getSource('drawing-source')) {
+      map.current.removeSource('drawing-source');
     }
 
-    // Add point marker
-    map.current.addSource(markerId, {
-      type: 'geojson',
-      data: {
+    if (drawingCoords.length === 0) return;
+
+    // Create GeoJSON for points and polygon
+    const features = [];
+
+    // Add point markers
+    drawingCoords.forEach((coord, index) => {
+      features.push({
         type: 'Feature',
-        properties: { pointNumber },
+        properties: { type: 'point', index },
         geometry: {
           type: 'Point',
-          coordinates: [lng, lat]
+          coordinates: coord
         }
+      });
+    });
+
+    // Add polygon if we have 3+ points
+    if (drawingCoords.length >= 3) {
+      const closedCoords = [...drawingCoords, drawingCoords[0]];
+      features.push({
+        type: 'Feature',
+        properties: { type: 'polygon' },
+        geometry: {
+          type: 'Polygon',
+          coordinates: [closedCoords]
+        }
+      });
+    }
+
+    // Add single GeoJSON source
+    map.current.addSource('drawing-source', {
+      type: 'geojson',
+      data: {
+        type: 'FeatureCollection',
+        features
       }
     });
 
+    // Add polygon fill layer
     map.current.addLayer({
-      id: markerId,
+      id: 'drawing-polygon-fill',
+      type: 'fill',
+      source: 'drawing-source',
+      filter: ['==', ['get', 'type'], 'polygon'],
+      paint: {
+        'fill-color': '#3b82f6',
+        'fill-opacity': 0.3
+      }
+    });
+
+    // Add polygon outline layer
+    map.current.addLayer({
+      id: 'drawing-polygon-outline',
+      type: 'line',
+      source: 'drawing-source',
+      filter: ['==', ['get', 'type'], 'polygon'],
+      paint: {
+        'line-color': '#2563eb',
+        'line-width': 2
+      }
+    });
+
+    // Add point markers layer
+    map.current.addLayer({
+      id: 'drawing-points',
       type: 'circle',
-      source: markerId,
+      source: 'drawing-source',
+      filter: ['==', ['get', 'type'], 'point'],
       paint: {
         'circle-radius': 6,
         'circle-color': '#2563eb',
@@ -307,35 +356,58 @@ export const MapInterface = () => {
         'circle-stroke-color': '#ffffff'
       }
     });
-  }, []);
+  }, [drawingCoords]);
 
-  const clearDrawingMarkers = useCallback(() => {
+  const clearDrawing = useCallback(() => {
     if (!map.current) return;
-    
-    console.log('🧹 Clearing drawing markers...');
-    
-    // Remove all drawing point markers - try up to 50 potential markers
-    for (let i = 1; i <= 50; i++) {
-      const markerId = `drawing-point-${i}`;
-      if (map.current.getLayer(markerId)) {
-        console.log('Removing marker layer:', markerId);
-        map.current.removeLayer(markerId);
+
+    // Remove all drawing layers
+    const layers = ['drawing-polygon-fill', 'drawing-polygon-outline', 'drawing-points'];
+    layers.forEach(layerId => {
+      if (map.current?.getLayer(layerId)) {
+        map.current.removeLayer(layerId);
       }
-      if (map.current.getSource(markerId)) {
-        console.log('Removing marker source:', markerId);
-        map.current.removeSource(markerId);
-      }
+    });
+
+    if (map.current.getSource('drawing-source')) {
+      map.current.removeSource('drawing-source');
     }
-    
-    console.log('✅ Drawing markers cleared');
+
+    // Clear selected area display
+    if (map.current.getLayer('selected-area-fill')) {
+      map.current.removeLayer('selected-area-fill');
+    }
+    if (map.current.getLayer('selected-area-outline')) {
+      map.current.removeLayer('selected-area-outline');
+    }
+    if (map.current.getSource('selected-area')) {
+      map.current.removeSource('selected-area');
+    }
+
+    setDrawingCoords([]);
+    setSelectedArea(null);
+    setCarbonCalculation(null);
   }, []);
 
-  const showPolygonPreview = useCallback((coords: Array<[number, number]>) => {
-    if (!map.current || coords.length < 3) return;
+  const finishDrawing = useCallback(() => {
+    if (drawingCoords.length < 3) {
+      toast.error('Need at least 3 points to create an area');
+      return;
+    }
 
-    // Close the polygon for preview
-    const closedCoords = [...coords, coords[0]];
+    // Calculate area
+    const areaCalc = calculatePolygonArea(drawingCoords);
+    const area = {
+      coordinates: drawingCoords,
+      areaHectares: areaCalc.hectares,
+      areaAcres: areaCalc.acres
+    };
 
+    // Clear drawing layer and show final polygon
+    clearDrawing();
+    
+    // Create final polygon
+    const closedCoords = [...drawingCoords, drawingCoords[0]];
     const polygonGeoJSON = {
       type: 'Feature' as const,
       properties: {},
@@ -345,247 +417,96 @@ export const MapInterface = () => {
       }
     };
 
-    // Remove existing preview layers
-    if (map.current.getLayer('polygon-preview-fill')) {
-      map.current.removeLayer('polygon-preview-fill');
-    }
-    if (map.current.getLayer('polygon-preview-outline')) {
-      map.current.removeLayer('polygon-preview-outline');
-    }
-    if (map.current.getSource('polygon-preview')) {
-      map.current.removeSource('polygon-preview');
-    }
-
-    // Add preview polygon with different styling
-    map.current.addSource('polygon-preview', {
+    map.current?.addSource('selected-area', {
       type: 'geojson',
       data: polygonGeoJSON
     });
 
-    map.current.addLayer({
-      id: 'polygon-preview-fill',
+    map.current?.addLayer({
+      id: 'selected-area-fill',
       type: 'fill',
-      source: 'polygon-preview',
+      source: 'selected-area',
       paint: {
         'fill-color': '#3b82f6',
-        'fill-opacity': 0.2
+        'fill-opacity': 0.3
       }
     });
 
-    map.current.addLayer({
-      id: 'polygon-preview-outline',
+    map.current?.addLayer({
+      id: 'selected-area-outline',
       type: 'line',
-      source: 'polygon-preview',
+      source: 'selected-area',
       paint: {
-        'line-color': '#3b82f6',
-        'line-width': 2,
-        'line-dasharray': [2, 2] // Dashed line for preview
+        'line-color': '#2563eb',
+        'line-width': 2
       }
     });
-  }, []);
 
-
-
-  const clearAllDrawingElements = useCallback(() => {
-    if (!map.current) return;
+    setSelectedArea(area);
+    setIsDrawing(false);
+    setDrawingCoords([]);
     
-    console.log('🧹 Clearing all drawing elements - COMPREHENSIVE CLEAR');
-    
-    // Get all layers and sources to see what exists
-    const style = map.current.getStyle();
-    console.log('Current map layers:', style.layers?.map(l => l.id) || 'none');
-    console.log('Current map sources:', Object.keys(style.sources || {}));
-    
-    // Clear drawing markers
-    clearDrawingMarkers();
-    
-    // Clear ALL possible polygon-related layers and sources
-    const allPossibleLayers = [
-      'polygon-preview-fill',
-      'polygon-preview-outline', 
-      'selected-area-fill',
-      'selected-area-outline',
-      'drawing-preview-fill',
-      'drawing-preview-outline',
-      'area-preview-fill',
-      'area-preview-outline'
-    ];
-    
-    const allPossibleSources = [
-      'polygon-preview',
-      'selected-area', 
-      'drawing-preview',
-      'area-preview'
-    ];
-    
-    // Remove all possible layers
-    allPossibleLayers.forEach(layerId => {
-      if (map.current?.getLayer(layerId)) {
-        console.log('🗑️ Removing layer:', layerId);
-        map.current.removeLayer(layerId);
-      }
-    });
-    
-    // Remove all possible sources
-    allPossibleSources.forEach(sourceId => {
-      if (map.current?.getSource(sourceId)) {
-        console.log('🗑️ Removing source:', sourceId);
-        map.current.removeSource(sourceId);
-      }
-    });
-    
-    // Double-check what's left
-    const remainingStyle = map.current.getStyle();
-    const remainingLayers = remainingStyle.layers?.map(l => l.id) || [];
-    const remainingSources = Object.keys(remainingStyle.sources || {});
-    
-    console.log('Remaining layers after clear:', remainingLayers);
-    console.log('Remaining sources after clear:', remainingSources);
-    
-    console.log('✅ All drawing elements cleared (hopefully!)');
-  }, [clearDrawingMarkers]);
-
-  const cancelDrawing = useCallback(() => {
-    console.log('❌ Cancelling drawing mode');
-    setDrawingMode(false);
-    setCoordinates([]);
-    setSelectedArea(null);
-    setCarbonCalculation(null);
-    clearDrawingMarkers();
-    toast.info('Drawing cancelled');
-  }, [clearDrawingMarkers]);
+    // Calculate carbon
+    calculateCarbonForSelectedArea(area);
+    toast.success('Area created! Calculating carbon...');
+  }, [drawingCoords, clearDrawing]);
 
   const handleMapClick = useCallback((e: mapboxgl.MapMouseEvent) => {
-    console.log('🖱️ Map clicked', { drawingMode, coordinates: coordinates.length, lngLat: e.lngLat });
-    
-    if (!drawingMode) {
-      console.log('❌ Not in drawing mode, ignoring click');
-      return;
-    }
+    if (!isDrawing) return;
 
     const { lng, lat } = e.lngLat;
-    const newCoordinates = [...coordinates, [lng, lat] as [number, number]];
-    console.log('📍 Adding new coordinate', { lng, lat, total: newCoordinates.length });
-    setCoordinates(newCoordinates);
+    const newCoords = [...drawingCoords, [lng, lat] as [number, number]];
+    setDrawingCoords(newCoords);
+  }, [isDrawing, drawingCoords]);
 
-    // Add visual marker for the clicked point
-    addPointMarker(lng, lat, newCoordinates.length);
+  // Update drawing layer when coordinates change
+  useEffect(() => {
+    updateDrawingLayer();
+  }, [drawingCoords, updateDrawingLayer]);
 
-    // Show preview and calculate dynamically if we have 3+ points
-    if (newCoordinates.length >= 3) {
-      console.log('🔷 Showing polygon preview and calculating for', newCoordinates.length, 'points');
-      showPolygonPreview(newCoordinates);
-      // Calculate area and trigger carbon calculation dynamically
-      const areaCalculation = calculatePolygonArea(newCoordinates);
-      const areaData = { 
-        coordinates: newCoordinates, 
-        areaHectares: areaCalculation.hectares,
-        areaAcres: areaCalculation.acres
-      };
-      setSelectedArea(areaData);
-      // Auto-calculate carbon for the current polygon
-      calculateCarbonForSelectedArea(areaData);
-    }
-  }, [drawingMode, coordinates, addPointMarker, showPolygonPreview]);
-
-  const addMapEventListeners = useCallback(() => {
-    console.log('🔧 addMapEventListeners called');
-    if (!map.current) {
-      console.log('❌ No map.current available');
-      return;
-    }
-
-    console.log('📍 Current drawing mode:', drawingMode);
-    
-    // Remove existing listeners first
-    map.current.off('click', handleMapClick);
-    
-    // Add fresh listeners with current state
-    map.current.on('click', handleMapClick);
-    console.log('✅ Map click event listener attached/updated');
-    
-    // Add keyboard event listeners
+  // Handle escape key
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      console.log('⌨️ Key pressed:', e.key, 'Drawing mode:', drawingMode);
-      if (e.key === 'Escape' && drawingMode) {
-        cancelDrawing();
+      if (e.key === 'Escape' && isDrawing) {
+        setIsDrawing(false);
+        clearDrawing();
+        toast.info('Drawing cancelled');
       }
     };
-    
-    window.addEventListener('keydown', handleKeyDown);
-    
-    // Store cleanup function
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [handleMapClick, drawingMode, cancelDrawing]);
 
-  // Re-attach event listeners when drawing state changes
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isDrawing, clearDrawing]);
+
+
+  // Simple event listener setup - always active
   useEffect(() => {
-    console.log('🔄 useEffect triggered - isMapLoaded:', isMapLoaded, 'drawingMode:', drawingMode);
-    if (isMapLoaded && map.current) {
-      console.log('🔄 Updating event listeners due to state change');
-      addMapEventListeners();
-    }
-  }, [addMapEventListeners, isMapLoaded, drawingMode]);
+    if (!map.current || !isMapLoaded) return;
+
+    map.current.on('click', handleMapClick);
+    
+    return () => {
+      map.current?.off('click', handleMapClick);
+    };
+  }, [handleMapClick, isMapLoaded]);
 
   const startDrawing = () => {
-    console.log('🎯 Starting drawing mode - DEBUGGING VERSION');
-    
-    // Show current state before clearing
-    console.log('Current state before clearing:', {
-      drawingMode,
-      coordinates: coordinates.length,
-      selectedArea: selectedArea ? 'exists' : 'null',
-      carbonCalculation: carbonCalculation ? 'exists' : 'null'
-    });
-    
-    // Force clear everything first with explicit marker clearing
-    console.log('🧹 FORCE CLEARING EVERYTHING NOW');
-    clearDrawingMarkers();
-    clearAllDrawingElements();
-    
-    // Ensure we start with completely clean state
-    setCoordinates([]);
-    setSelectedArea(null);
-    setCarbonCalculation(null);
-    
-    console.log('State after clearing, before starting drawing mode');
-    
-    // Immediate state change - no delay
-    setDrawingMode(true);
-    toast.info('Drawing mode started - map should be completely clear!');
-  };
-
-  const calculateCarbonForArea = async () => {
-    if (!selectedArea) return;
-    await calculateCarbonForSelectedArea(selectedArea);
+    clearDrawing();
+    setIsDrawing(true);
+    toast.info('Click on the map to start drawing. Press ESC to cancel.');
   };
 
   const clearMap = () => {
-    if (!map.current) return;
-
-    console.log('🧹 Clearing entire map - FORCE CLEAR');
+    clearDrawing();
+    setIsDrawing(false);
     
-    // Force clear markers first, then other elements
-    clearDrawingMarkers();
-    clearAllDrawingElements();
-    
-    // Clear drawing state completely
-    setDrawingMode(false);
-    setCoordinates([]);
-    setSelectedArea(null);
-    setCarbonCalculation(null);
-
     // Clear dataset layers
     clearDatasetLayers();
     setSelectedDataset(null);
     setDatasetMetadata(null);
-    
     setActiveLayers({});
     
-    console.log('✅ Map completely cleared');
-    toast.info('Map cleared - all elements removed');
+    toast.info('Map cleared');
   };
 
 
@@ -908,7 +829,7 @@ export const MapInterface = () => {
                       ) : (
                         <div className="text-center py-2">
                           <p className="text-sm text-muted-foreground">
-                            {drawingMode ? 'Add more points for calculation' : 'Click "Draw Area" to start'}
+                            {isDrawing ? 'Add more points, then click Finish' : 'Click "Draw Area" to start'}
                           </p>
                         </div>
                       )}
@@ -946,14 +867,37 @@ export const MapInterface = () => {
                 selectedBaseMap={selectedBaseMap}
                 onBaseMapChange={handleBaseMapChange}
               />
-              <Button
-                variant={drawingMode ? "default" : "outline"}
-                onClick={drawingMode ? cancelDrawing : startDrawing}
-                size="sm"
-              >
-                <Square className="w-4 h-4 mr-2" />
-                {drawingMode ? 'Stop Drawing' : 'Draw Area'}
-              </Button>
+              {!isDrawing ? (
+                <Button
+                  variant="outline"
+                  onClick={startDrawing}
+                  className="flex items-center gap-2"
+                >
+                  <Square className="w-4 h-4" />
+                  Draw Area
+                </Button>
+              ) : (
+                <div className="flex gap-2">
+                  <Button
+                    variant="default"
+                    onClick={finishDrawing}
+                    disabled={drawingCoords.length < 3}
+                    className="flex items-center gap-2"
+                  >
+                    Finish ({drawingCoords.length} points)
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setIsDrawing(false);
+                      clearDrawing();
+                      toast.info('Drawing cancelled');
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              )}
               <Button variant="outline" onClick={clearMap} size="sm">
                 <RotateCcw className="w-4 h-4 mr-2" />
                 Clear
@@ -982,14 +926,14 @@ export const MapInterface = () => {
             </div>
           )}
 
-          {drawingMode && (
+          {isDrawing && (
             <div className="absolute top-4 left-4 bg-card p-3 rounded-lg shadow-lg border border-border">
               <p className="text-sm text-foreground">
-                Drawing mode active. Points: {coordinates.length}
-                {coordinates.length >= 3 ? ' (Carbon calculating...)' : ` (Need ${Math.max(0, 3 - coordinates.length)} more for calculation)`}
+                Drawing mode active. Points: {drawingCoords.length}
+                {drawingCoords.length >= 3 ? ' (Ready to finish!)' : ` (Need ${Math.max(0, 3 - drawingCoords.length)} more)`}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                ESC to cancel • Results update with each point
+                ESC to cancel • Click Finish when ready
               </p>
             </div>
           )}
