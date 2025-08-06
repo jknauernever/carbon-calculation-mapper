@@ -670,6 +670,7 @@ export const MapInterface = () => {
       
       // Add tile source
       console.log('🗺️ Adding tile source:', sourceId);
+      console.log('🔍 Tile URL for Mapbox:', tileUrl);
       map.current.addSource(sourceId, {
         type: 'raster',
         tiles: [tileUrl],
@@ -678,6 +679,23 @@ export const MapInterface = () => {
         maxzoom: 15,
         attribution: 'Google Earth Engine'
       });
+      
+      // Test a specific tile to see if it loads
+      const testTileUrl = tileUrl.replace('{z}', '10').replace('{x}', '512').replace('{y}', '256');
+      console.log('🧪 Testing tile URL:', testTileUrl);
+      
+      fetch(testTileUrl)
+        .then(response => {
+          console.log('🧪 Test tile response:', response.status, response.ok);
+          if (response.ok) {
+            console.log('✅ Test tile loaded successfully');
+          } else {
+            console.log('❌ Test tile failed to load');
+          }
+        })
+        .catch(error => {
+          console.error('❌ Test tile error:', error);
+        });
       
       // Find insertion point (before labels)
       let beforeId: string | undefined;
