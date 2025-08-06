@@ -621,20 +621,8 @@ export const MapInterface = () => {
         attribution: 'Google Earth Engine via GEE Tile Server'
       });
       
-      // Add raster layer with dynamic opacity
-      // Find the best layer to insert before (labels should be on top)
-      const layers = map.current.getStyle().layers;
-      let beforeId: string | undefined;
-      
-      // Look for label layers to insert before them
-      for (const layer of layers) {
-        if (layer.id.includes('label') || layer.id.includes('text') || layer.id.includes('symbol')) {
-          beforeId = layer.id;
-          break;
-        }
-      }
-      
-      console.log('Adding dataset layer before:', beforeId || 'top');
+      // Add raster layer with dynamic opacity - ALWAYS on top layer for visibility
+      console.log('Adding dataset layer on top');
       
       map.current.addLayer({
         id: layerId,
@@ -643,12 +631,12 @@ export const MapInterface = () => {
         paint: {
           'raster-opacity': opacity,
           'raster-fade-duration': 300,
-          'raster-contrast': 0.3, // Increased contrast for better visibility
+          'raster-contrast': 0.5, // Increased contrast for maximum visibility
           'raster-brightness-min': 0.0, // Ensure full brightness range
           'raster-brightness-max': 1.0,
-          'raster-saturation': 1.5 // Increased saturation for better visibility
+          'raster-saturation': 2.0 // Maximum saturation for visibility
         }
-      }, beforeId);
+      }); // No beforeId - places on top layer
       
       // Add to active datasets
       setActiveDatasets(prev => ({
