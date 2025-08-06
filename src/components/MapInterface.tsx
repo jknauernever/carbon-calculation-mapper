@@ -62,6 +62,7 @@ export const MapInterface = () => {
     const fetchMapboxToken = async () => {
       try {
         console.log('🔑 Fetching Mapbox token...');
+        // Use supabase.functions.invoke which handles auth properly
         const { data, error } = await supabase.functions.invoke('get-mapbox-token');
         
         if (error) {
