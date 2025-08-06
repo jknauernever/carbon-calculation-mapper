@@ -10,7 +10,7 @@ import { GEELayerToggle } from "./GEELayerToggle";
 import { CarbonResults } from "./CarbonResults";
 import { GEEDataVisualization } from "./GEEDataVisualization";
 import { NDVITimeSeriesPanel } from "./NDVITimeSeriesPanel";
-import { TestGEEHardcoded } from "./TestGEEHardcoded";
+
 import { supabase } from "@/integrations/supabase/client";
 
 interface CarbonCalculation {
@@ -231,68 +231,9 @@ export const MapInterface = () => {
       map.current.removeSource('selected-area');
     }
 
-    // Clear GEE layers
-    Object.keys(activeLayers).forEach(layerId => {
-      removeGEELayer(layerId);
-    });
     setActiveLayers({});
   };
 
-  // Test GEE Authentication function
-  const testGEEAuthentication = async () => {
-    setIsCalculating(true);
-    try {
-      console.log('🧪 Testing GEE Authentication...');
-      
-      // Test authentication by trying to generate a tile URL
-      const { data, error } = await supabase.functions.invoke('calculate-carbon-gee', {
-        body: {
-          action: 'getTileUrl',
-          layerId: 'ndvi',
-          bbox: [-100, 35, -95, 40] // Sample bounding box
-        },
-      });
-
-      if (error) {
-        console.error('❌ GEE Authentication test failed:', error);
-        toast.error(`GEE Auth failed: ${error.message}`);
-        return;
-      }
-
-      console.log('✅ GEE Authentication test successful:', data);
-      toast.success('GEE Authentication is working!');
-      
-      // Also test tile URL validity
-      if (data.tileUrl) {
-        const testTileUrl = data.tileUrl
-          .replace('{z}', '5')
-          .replace('{x}', '10') 
-          .replace('{y}', '12');
-        
-        console.log('🔗 Testing tile URL:', testTileUrl);
-        
-        try {
-          const response = await fetch(testTileUrl, { method: 'HEAD' });
-          console.log('📊 Tile response:', response.status, response.statusText);
-          
-          if (response.ok) {
-            toast.success('Tile URL is accessible!');
-          } else {
-            toast.warning(`Tile URL returned ${response.status}: ${response.statusText}`);
-          }
-        } catch (tileError) {
-          console.error('🔗 Tile URL test failed:', tileError);
-          toast.warning('Tile URL test failed - this may be normal for some layers');
-        }
-      }
-      
-    } catch (error) {
-      console.error('❌ Authentication test error:', error);
-      toast.error('Authentication test failed');
-    } finally {
-      setIsCalculating(false);
-    }
-  };
 
   const calculateCarbonForArea = async () => {
     if (!selectedArea) return;
@@ -343,148 +284,9 @@ export const MapInterface = () => {
     toast.success(`Searching for: ${searchAddress}`);
   };
 
-  const handleLayerToggle = (layerId: string, enabled: boolean) => {
-    if (enabled) {
-      addGEELayer(layerId);
-    } else {
-      removeGEELayer(layerId);
-    }
 
-    setActiveLayers(prev => ({
-      ...prev,
-      [layerId]: { ...prev[layerId], enabled }
-    }));
-  };
 
-  const handleLayerOpacityChange = (layerId: string, opacity: number) => {
-    if (map.current && map.current.getLayer(layerId)) {
-      const layerType = map.current.getLayer(layerId)?.type;
-      if (layerType === 'raster') {
-        map.current.setPaintProperty(layerId, 'raster-opacity', opacity / 100);
-      }
-    }
 
-    setActiveLayers(prev => ({
-      ...prev,
-      [layerId]: { ...prev[layerId], opacity }
-    }));
-  };
-
-  const addGEELayer = async (layerId: string) => {
-    if (!map.current || !isMapLoaded) return;
-
-    try {
-      console.log(`🧪 TESTING: Adding layer: ${layerId}`);
-      
-      // Generate live GEE tile URL
-      const { data, error } = await supabase.functions.invoke('calculate-carbon-gee', {
-        body: {
-          action: 'getTileUrl',
-          layerId: layerId,
-          bbox: map.current.getBounds().toArray().flat()
-        },
-      });
-
-      if (error) {
-        console.error(`❌ Error getting tile URL for ${layerId}:`, error);
-        throw error;
-      }
-
-      const tileUrl = data.tileUrl;
-      console.log(`🔗 Generated URL for ${layerId}:`, tileUrl);
-
-      // Test the tile URL by trying to fetch a specific tile
-      const testTileUrl = tileUrl
-        .replace('{z}', '5')
-        .replace('{x}', '10') 
-        .replace('{y}', '12')
-        .replace('{bbox-epsg-3857}', '-20037508.34,-20037508.34,20037508.34,20037508.34');
-      
-      console.log(`🧪 Testing specific tile URL: ${testTileUrl}`);
-      
-      try {
-        const testResponse = await fetch(testTileUrl, { method: 'HEAD' });
-        console.log(`📊 Tile test result for ${layerId}:`, {
-          status: testResponse.status,
-          statusText: testResponse.statusText,
-          contentType: testResponse.headers.get('content-type'),
-          url: testTileUrl
-        });
-        
-        if (testResponse.status !== 200) {
-          console.warn(`⚠️ Tile test failed for ${layerId}: ${testResponse.status}`);
-        } else {
-          console.log(`✅ Tile test SUCCESS for ${layerId}`);
-        }
-      } catch (testError) {
-        console.error(`❌ Tile test error for ${layerId}:`, testError);
-      }
-
-      // Remove existing layer if it exists
-      if (map.current.getLayer(layerId)) {
-        console.log(`🗑️ Removing existing layer: ${layerId}`);
-        map.current.removeLayer(layerId);
-      }
-      if (map.current.getSource(layerId)) {
-        console.log(`🗑️ Removing existing source: ${layerId}`);
-        map.current.removeSource(layerId);
-      }
-
-      // Add new GEE tile layer
-      console.log(`📍 Adding source for ${layerId}:`, tileUrl);
-      map.current.addSource(layerId, {
-        type: 'raster',
-        tiles: [tileUrl],
-        tileSize: 256
-      });
-
-      console.log(`🎨 Adding layer for ${layerId}`);
-      map.current.addLayer({
-        id: layerId,
-        type: 'raster',
-        source: layerId,
-        paint: {
-          'raster-opacity': (activeLayers[layerId]?.opacity || 80) / 100
-        }
-      });
-
-      // Add comprehensive event listeners for debugging
-      map.current.on('sourcedataloading', (e) => {
-        if (e.sourceId === layerId) {
-          console.log(`⏳ Loading tiles for ${layerId}`);
-        }
-      });
-
-      map.current.on('sourcedata', (e) => {
-        if (e.sourceId === layerId && e.isSourceLoaded) {
-          console.log(`✅ Tiles loaded successfully for ${layerId}`);
-        }
-      });
-
-      map.current.on('error', (e: any) => {
-        console.error(`❌ Map error for ${layerId}:`, e);
-        if (e.error && typeof e.error === 'object') {
-          console.error(`Failed URL: ${(e.error as any).url || 'Unknown URL'}`);
-        }
-      });
-
-      toast.success(`${layerId} layer added - check console for verification`);
-    } catch (error) {
-      console.error(`❌ Error adding ${layerId} layer:`, error);
-      toast.error(`Failed to load ${layerId} layer - check console for details`);
-    }
-  };
-
-  const removeGEELayer = (layerId: string) => {
-    if (!map.current) return;
-
-    if (map.current.getLayer(layerId)) {
-      map.current.removeLayer(layerId);
-    }
-    if (map.current.getSource(layerId)) {
-      map.current.removeSource(layerId);
-    }
-  };
 
   return (
     <div className="flex h-screen bg-background">
@@ -547,15 +349,13 @@ export const MapInterface = () => {
         {!sidebarCollapsed && (
           <div className="flex-1 overflow-y-auto p-4">
             {activePanel === 'carbon' && (
-              <GEELayerToggle
-                onLayerToggle={handleLayerToggle}
-                onLayerOpacityChange={handleLayerOpacityChange}
-              />
+              <div className="text-center p-4 text-muted-foreground">
+                <p>Data layers will be integrated with your Vercel tile API service.</p>
+              </div>
             )}
             
             {activePanel === 'ndvi' && (
               <div className="space-y-4">
-                <TestGEEHardcoded />
                 <NDVITimeSeriesPanel selectedCoordinates={clickedCoordinates} />
               </div>
             )}
@@ -597,15 +397,6 @@ export const MapInterface = () => {
               <Button variant="outline" onClick={clearMap} size="sm">
                 <RotateCcw className="w-4 h-4 mr-2" />
                 Clear
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={testGEEAuthentication} 
-                disabled={isCalculating}
-                size="sm"
-                className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
-              >
-                🧪 Test GEE
               </Button>
             </div>
           </div>
