@@ -884,15 +884,19 @@ export const MapInterface = () => {
                             <div className="grid grid-cols-1 gap-3 text-sm">
                               <div className="bg-muted/50 p-2 rounded">
                                 <span className="text-muted-foreground">Total CO₂e:</span>
-                                <span className="font-semibold ml-2">{carbonCalculation.total_co2e.toFixed(1)} tonnes</span>
+                                <span className="font-semibold ml-2">{carbonCalculation.total_co2e.toFixed(1)} t CO₂e</span>
                               </div>
                               <div className="bg-muted/50 p-2 rounded">
-                                <span className="text-muted-foreground">Biomass:</span>
-                                <span className="font-semibold ml-2">{carbonCalculation.above_ground_biomass.toFixed(1)} tonnes</span>
+                                <span className="text-muted-foreground">Above-Ground Biomass:</span>
+                                <span className="font-semibold ml-2">{(carbonCalculation.above_ground_biomass * 3.67).toFixed(1)} t CO₂e</span>
+                              </div>
+                              <div className="bg-muted/50 p-2 rounded">
+                                <span className="text-muted-foreground">Below-Ground Biomass:</span>
+                                <span className="font-semibold ml-2">{(carbonCalculation.below_ground_biomass * 3.67).toFixed(1)} t CO₂e</span>
                               </div>
                               <div className="bg-muted/50 p-2 rounded">
                                 <span className="text-muted-foreground">Soil Carbon:</span>
-                                <span className="font-semibold ml-2">{carbonCalculation.soil_organic_carbon.toFixed(1)} tonnes</span>
+                                <span className="font-semibold ml-2">{(carbonCalculation.soil_organic_carbon * 3.67).toFixed(1)} t CO₂e</span>
                               </div>
                               <div className="bg-muted/50 p-2 rounded">
                                 <span className="text-muted-foreground">Method:</span>
