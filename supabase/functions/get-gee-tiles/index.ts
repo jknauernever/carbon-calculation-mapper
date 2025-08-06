@@ -89,6 +89,25 @@ serve(async (req) => {
     
     console.log('Generated tile URL template:', tileUrlTemplate);
     
+    // Test the API endpoint by fetching a sample tile first
+    const testTileUrl = `https://gee-tile-server.vercel.app/api/tiles/5/10/12?dataset=${dataset}&year=${year}&month=${month}&apikey=${geeApiKey}`;
+    console.log('Testing tile endpoint:', testTileUrl);
+    
+    try {
+      const testResponse = await fetch(testTileUrl);
+      console.log('Test tile response status:', testResponse.status);
+      console.log('Test tile response headers:', Object.fromEntries(testResponse.headers.entries()));
+      
+      if (!testResponse.ok) {
+        const errorText = await testResponse.text();
+        console.error('Test tile error:', errorText);
+        throw new Error(`Tile server error: ${testResponse.status} - ${errorText}`);
+      }
+    } catch (testError) {
+      console.error('Tile test failed:', testError);
+      throw new Error(`Tile server unreachable: ${testError.message}`);
+    }
+    
     return new Response(
       JSON.stringify({ 
         tileUrl: tileUrlTemplate,
