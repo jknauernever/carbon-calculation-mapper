@@ -61,6 +61,7 @@ export const MapInterface = () => {
   useEffect(() => {
     const fetchMapboxToken = async () => {
       try {
+        console.log('🚀 STARTING MAP INITIALIZATION PROCESS');
         console.log('Fetching Mapbox token...');
         const { data, error } = await supabase.functions.invoke('get-mapbox-token');
         
@@ -70,15 +71,20 @@ export const MapInterface = () => {
         }
         
         if (data?.token) {
-          console.log('Mapbox token received successfully');
+          console.log('✅ Mapbox token received successfully:', data.token.substring(0, 10) + '...');
           setMapboxToken(data.token);
-          initializeMap(data.token);
+          
+          // Force a small delay to ensure DOM is ready
+          setTimeout(() => {
+            console.log('🔄 Attempting to initialize map after delay...');
+            initializeMap(data.token);
+          }, 100);
         } else {
-          console.error('No token in response:', data);
+          console.error('❌ No token in response:', data);
           toast.error('Mapbox token not found. Please add MAPBOX_PUBLIC_TOKEN to Supabase Edge Function secrets.');
         }
       } catch (error) {
-        console.error('Error fetching Mapbox token:', error);
+        console.error('❌ Error fetching Mapbox token:', error);
         toast.error('Failed to load map. Please configure Mapbox token in Supabase secrets.');
       }
     };
