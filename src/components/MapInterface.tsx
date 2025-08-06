@@ -113,6 +113,26 @@ export const MapInterface = () => {
     });
   }, [mapboxToken]);
 
+  // Handle map resize when sidebar toggles or window resizes
+  useEffect(() => {
+    const handleResize = () => {
+      if (map.current) {
+        map.current.resize();
+      }
+    };
+
+    // Listen for window resize events
+    window.addEventListener('resize', handleResize);
+    
+    // Resize map when sidebar collapsed state changes
+    const timeoutId = setTimeout(handleResize, 300); // Allow transition to complete
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(timeoutId);
+    };
+  }, [sidebarCollapsed]);
+
   const addMapEventListeners = () => {
     if (!map.current) return;
 
@@ -433,7 +453,7 @@ export const MapInterface = () => {
 
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen w-full bg-background overflow-hidden">
       {/* Left Sidebar */}
       <div className={`${sidebarCollapsed ? 'w-12' : 'w-80'} transition-all duration-300 bg-card border-r border-border flex flex-col`}>
         {/* Sidebar Header */}
@@ -544,7 +564,7 @@ export const MapInterface = () => {
       </div>
 
       {/* Main Map Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-w-0 w-full">
         {/* Map Controls Header */}
         <div className="bg-card border-b border-border p-4">
           <div className="flex items-center gap-4">
@@ -583,8 +603,8 @@ export const MapInterface = () => {
         </div>
 
         {/* Map Container */}
-        <div className="flex-1 relative">
-          <div ref={mapContainer} className="absolute inset-0" />
+        <div className="flex-1 relative w-full min-h-0">
+          <div ref={mapContainer} className="absolute inset-0 w-full h-full" />
           
           {!isMapLoaded && (
             <div className="absolute inset-0 flex items-center justify-center bg-background/80">
