@@ -93,25 +93,20 @@ export const MapInterface = () => {
   }, []);
 
   const initializeMap = useCallback((token?: string) => {
-    console.log('🚀 initializeMap called');
+    console.log('🚀 INIT MAP - Container exists:', !!mapContainer.current);
+    console.log('🚀 INIT MAP - Map exists:', !!map.current);
     
     if (!mapContainer.current) {
-      console.log('❌ Map container not ready, waiting...');
+      console.log('❌ No map container, retrying in 500ms...');
+      setTimeout(() => initializeMap(token), 500);
       return;
     }
     
-    // Clean up existing map if it exists but isn't working properly
+    // Always recreate map to ensure fresh state
     if (map.current) {
-      console.log('🗺️ Map already exists, checking if it needs reset...');
-      // Check if map is properly loaded
-      if (map.current.loaded()) {
-        console.log('✅ Existing map is loaded and working');
-        return;
-      } else {
-        console.log('🔄 Existing map not loaded properly, removing and recreating...');
-        map.current.remove();
-        map.current = null;
-      }
+      console.log('🔄 Removing existing map...');
+      map.current.remove();
+      map.current = null;
     }
 
     const mapboxAccessToken = token || mapboxToken;
