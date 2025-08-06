@@ -61,7 +61,6 @@ export const MapInterface = () => {
   useEffect(() => {
     const fetchMapboxToken = async () => {
       try {
-        console.log('🚀 STARTING MAP INITIALIZATION PROCESS');
         console.log('Fetching Mapbox token...');
         const { data, error } = await supabase.functions.invoke('get-mapbox-token');
         
@@ -71,20 +70,15 @@ export const MapInterface = () => {
         }
         
         if (data?.token) {
-          console.log('✅ Mapbox token received successfully:', data.token.substring(0, 10) + '...');
+          console.log('Mapbox token received successfully');
           setMapboxToken(data.token);
-          
-          // Force a small delay to ensure DOM is ready
-          setTimeout(() => {
-            console.log('🔄 Attempting to initialize map after delay...');
-            initializeMap(data.token);
-          }, 100);
+          initializeMap(data.token);
         } else {
-          console.error('❌ No token in response:', data);
+          console.error('No token in response:', data);
           toast.error('Mapbox token not found. Please add MAPBOX_PUBLIC_TOKEN to Supabase Edge Function secrets.');
         }
       } catch (error) {
-        console.error('❌ Error fetching Mapbox token:', error);
+        console.error('Error fetching Mapbox token:', error);
         toast.error('Failed to load map. Please configure Mapbox token in Supabase secrets.');
       }
     };
@@ -93,20 +87,10 @@ export const MapInterface = () => {
   }, []);
 
   const initializeMap = useCallback((token?: string) => {
-    console.log('🚀 INIT MAP - Container exists:', !!mapContainer.current);
-    console.log('🚀 INIT MAP - Map exists:', !!map.current);
-    
-    if (!mapContainer.current) {
-      console.log('❌ No map container, retrying in 500ms...');
-      setTimeout(() => initializeMap(token), 500);
+    console.log('🚀 initializeMap called');
+    if (!mapContainer.current || map.current) {
+      console.log('❌ Map container not ready or map already exists');
       return;
-    }
-    
-    // Always recreate map to ensure fresh state
-    if (map.current) {
-      console.log('🔄 Removing existing map...');
-      map.current.remove();
-      map.current = null;
     }
 
     const mapboxAccessToken = token || mapboxToken;
@@ -627,9 +611,7 @@ export const MapInterface = () => {
 
       console.log('Tile URL template received:', data.tileUrl);
       
-      // Add tile source with the secure tile URL and debugging
-      console.log('Adding tile source with URL:', data.tileUrl);
-      
+      // Add tile source with the secure tile URL
       map.current.addSource(sourceId, {
         type: 'raster',
         tiles: [data.tileUrl],
@@ -639,8 +621,20 @@ export const MapInterface = () => {
         attribution: 'Google Earth Engine via GEE Tile Server'
       });
       
-      // Add raster layer with dynamic opacity - ALWAYS on top layer for visibility
-      console.log('Adding dataset layer on top');
+      // Add raster layer with dynamic opacity
+      // Find the best layer to insert before (labels should be on top)
+      const layers = map.current.getStyle().layers;
+      let beforeId: string | undefined;
+      
+      // Look for label layers to insert before them
+      for (const layer of layers) {
+        if (layer.id.includes('label') || layer.id.includes('text') || layer.id.includes('symbol')) {
+          beforeId = layer.id;
+          break;
+        }
+      }
+      
+      console.log('Adding dataset layer before:', beforeId || 'top');
       
       map.current.addLayer({
         id: layerId,
@@ -648,65 +642,12 @@ export const MapInterface = () => {
         source: sourceId,
         paint: {
           'raster-opacity': opacity,
-          'raster-fade-duration': 0, // Remove fade for immediate visibility
-          'raster-contrast': 1.0, // Maximum contrast
-          'raster-brightness-min': 0.0,
-          'raster-brightness-max': 1.0,
-          'raster-saturation': 3.0 // Extreme saturation for debugging
+          'raster-fade-duration': 300,
+          'raster-contrast': 0.2,
+          'raster-brightness-min': 0.1,
+          'raster-saturation': 1.2
         }
-      }); // No beforeId - places on top layer
-      
-      // Debug: Check if layer was added
-      setTimeout(() => {
-        const layer = map.current?.getLayer(layerId);
-        const source = map.current?.getSource(sourceId);
-        console.log('=== LAYER DEBUG INFO ===');
-        console.log('Layer exists:', !!layer);
-        console.log('Source exists:', !!source);
-        console.log('Layer ID searched:', layerId);
-        console.log('Source ID searched:', sourceId);
-        
-        if (layer) {
-          console.log('Layer details:', {
-            id: layer.id,
-            type: layer.type,
-            source: layer.source,
-            paint: layer.paint
-          });
-        }
-        
-        if (source) {
-          const rasterSource = source as any; // Type assertion for raster source
-          console.log('Source details:', {
-            type: rasterSource.type,
-            tiles: rasterSource.tiles,
-            tileSize: rasterSource.tileSize
-          });
-        }
-        
-        const allLayers = map.current?.getStyle().layers || [];
-        console.log('All map layers:', allLayers.map(l => ({ id: l.id, type: l.type })));
-        console.log('Looking for layer with ID:', layerId);
-        console.log('Map style loaded:', map.current?.isStyleLoaded());
-        console.log('=== END DEBUG INFO ===');
-        
-        // Test if tiles are actually loading by adding error/data listeners
-        map.current?.on('error', (e) => {
-          console.error('Map error:', e);
-        });
-        
-        map.current?.on('sourcedata', (e) => {
-          if (e.sourceId === sourceId) {
-            console.log('Source data event for', sourceId, ':', e);
-          }
-        });
-        
-        map.current?.on('data', (e: any) => {
-          if (e.sourceId === sourceId) {
-            console.log('Data event for', sourceId, ':', e);
-          }
-        });
-      }, 2000);
+      }, beforeId);
       
       // Add to active datasets
       setActiveDatasets(prev => ({
@@ -737,30 +678,13 @@ export const MapInterface = () => {
       });
       
       // Zoom to a location where data is likely to be visible
-      if (dataset.id === 'ndvi' || dataset.id === 'evi') {
-        // Agricultural regions with high vegetation
+      if (dataset.id === 'ndvi') {
         map.current.flyTo({
-          center: [-94.0, 40.0], // Iowa/Nebraska - major corn belt
-          zoom: 10,
-          duration: 2000
-        });
-        toast.success(`✅ ${dataset.name} layer added - Zooming to agricultural area`);
-      } else if (dataset.id === 'temperature') {
-        // Show temperature variation
-        map.current.flyTo({
-          center: [-110.0, 45.0], // Rocky Mountain region - good temperature variation
+          center: [-95.0, 39.0], // Central US - agricultural area
           zoom: 8,
           duration: 2000
         });
-        toast.success(`✅ ${dataset.name} layer added - Zooming to temperature variation area`);
-      } else if (dataset.id === 'ndwi') {
-        // Water bodies
-        map.current.flyTo({
-          center: [-89.0, 46.5], // Great Lakes region
-          zoom: 8,
-          duration: 2000
-        });
-        toast.success(`✅ ${dataset.name} layer added - Zooming to water bodies`);
+        toast.success(`✅ ${dataset.name} layer added - Zooming to data area`);
       } else {
         toast.success(`✅ ${dataset.name} layer added successfully`);
       }

@@ -1,9 +1,11 @@
-import { SimpleMapInterface } from "@/components/SimpleMapInterface";
+import { MapInterface } from "@/components/MapInterface";
 
 const Index = () => {
   return (
     <div className="min-h-screen bg-background">
-      <SimpleMapInterface />
+      <div className="container mx-auto p-4">
+        <MapInterface />
+      </div>
     </div>
   );
 };
