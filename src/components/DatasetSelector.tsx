@@ -37,6 +37,7 @@ export const DatasetSelector: React.FC<DatasetSelectorProps> = ({
       setLoading(true);
       setError(null);
       
+      console.log('Fetching datasets from Vercel API...');
       const response = await fetch('https://gee-tile-server.vercel.app/api/datasets');
       
       if (!response.ok) {
@@ -44,33 +45,42 @@ export const DatasetSelector: React.FC<DatasetSelectorProps> = ({
       }
       
       const data = await response.json();
-      setDatasets(data.datasets || []);
+      console.log('API Response:', data);
+      
+      // Ensure we have a valid array of datasets
+      const datasetsArray = Array.isArray(data.datasets) ? data.datasets : 
+                           Array.isArray(data) ? data : [];
+      
+      console.log('Processed datasets:', datasetsArray);
+      setDatasets(datasetsArray);
       
       // Auto-expand first category if datasets exist
-      if (data.datasets && data.datasets.length > 0) {
-        const firstCategory = data.datasets[0].category;
+      if (datasetsArray.length > 0) {
+        const firstCategory = datasetsArray[0].category;
         setExpandedCategories({ [firstCategory]: true });
       }
       
-      toast.success(`Loaded ${data.datasets?.length || 0} datasets`);
+      toast.success(`Loaded ${datasetsArray.length} datasets`);
     } catch (error) {
       console.error('Error fetching datasets:', error);
       setError(error instanceof Error ? error.message : 'Failed to fetch datasets');
       toast.error('Failed to load datasets from Vercel API');
+      // Ensure datasets is always an array even on error
+      setDatasets([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Group datasets by category
-  const groupedDatasets = datasets.reduce((groups, dataset) => {
+  // Group datasets by category - ensure datasets is always an array
+  const groupedDatasets = Array.isArray(datasets) ? datasets.reduce((groups, dataset) => {
     const category = dataset.category || 'Other';
     if (!groups[category]) {
       groups[category] = [];
     }
     groups[category].push(dataset);
     return groups;
-  }, {} as Record<string, Dataset[]>);
+  }, {} as Record<string, Dataset[]>) : {};
 
   const toggleCategory = (category: string) => {
     setExpandedCategories(prev => ({
@@ -205,7 +215,7 @@ export const DatasetSelector: React.FC<DatasetSelectorProps> = ({
           ))
         )}
         
-        {datasets.length > 0 && (
+        {datasets && datasets.length > 0 && (
           <div className="pt-2 border-t border-border">
             <Button 
               onClick={fetchDatasets} 
