@@ -1,6 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
+// Simple in-memory cache for GEE tile URLs
+const geeUrlCache = new Map<string, string>();
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -54,48 +57,74 @@ serve(async (req) => {
       );
     }
 
-    // If z, x, y are provided, this is a tile request - get the tile URL first, then fetch the tile
+    // If z, x, y are provided, this is a tile request - fetch the actual tile
     if (z && x && y) {
-      console.log('Fetching tile for coordinates:', { z, x, y, dataset, year, month });
+      console.log('🔄 Fetching tile for coordinates:', { z, x, y, dataset, year, month });
       
-      // First get the tile URL from the Vercel API
-      const apiUrl = `https://gee-tile-server.vercel.app/api/tiles?dataset=${dataset}&year=${year}&month=${month}&apikey=${geeApiKey}`;
+      // Get the GEE tile URL (from cache or fetch)
+      const cacheKey = `${dataset}-${year}-${month}`;
+      let geeTileUrl = geeUrlCache.get(cacheKey);
       
-      try {
-        const apiResponse = await fetch(apiUrl);
+      if (!geeTileUrl) {
+        console.log('📡 Fetching GEE tile URL from Vercel API...');
         
-        if (!apiResponse.ok) {
-          console.error('API response failed:', apiResponse.status);
+        // Get the tile URL from the Vercel API
+        const apiUrl = `https://gee-tile-server.vercel.app/api/tiles?dataset=${dataset}&year=${year}&month=${month}&apikey=${geeApiKey}`;
+        
+        try {
+          const apiResponse = await fetch(apiUrl);
+          
+          if (!apiResponse.ok) {
+            console.error('❌ API response failed:', apiResponse.status);
+            return new Response(
+              JSON.stringify({ error: `API failed: ${apiResponse.status}` }),
+              { 
+                status: apiResponse.status, 
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+              }
+            );
+          }
+          
+          const apiData = await apiResponse.json();
+          
+          if (!apiData.tile_url) {
+            console.error('❌ No tile_url in API response:', apiData);
+            return new Response(
+              JSON.stringify({ error: 'No tile URL available' }),
+              { 
+                status: 500, 
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+              }
+            );
+          }
+          
+          geeTileUrl = apiData.tile_url;
+          geeUrlCache.set(cacheKey, geeTileUrl);
+          console.log('✅ Cached GEE tile URL:', geeTileUrl);
+          
+        } catch (error) {
+          console.error('❌ Error fetching GEE tile URL:', error);
           return new Response(
-            JSON.stringify({ error: `API failed: ${apiResponse.status}` }),
-            { 
-              status: apiResponse.status, 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-            }
-          );
-        }
-        
-        const apiData = await apiResponse.json();
-        
-        if (!apiData.tile_url) {
-          console.error('No tile_url in API response:', apiData);
-          return new Response(
-            JSON.stringify({ error: 'No tile URL available' }),
+            JSON.stringify({ error: `Failed to get GEE tile URL: ${error.message}` }),
             { 
               status: 500, 
               headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
             }
           );
         }
-        
-        // Now fetch the actual tile from GEE
-        const tileUrl = apiData.tile_url.replace('{z}', z).replace('{x}', x).replace('{y}', y);
-        console.log('Fetching tile from GEE:', tileUrl);
-        
+      } else {
+        console.log('✅ Using cached GEE tile URL');
+      }
+      
+      // Now fetch the actual tile from GEE
+      const tileUrl = geeTileUrl.replace('{z}', z).replace('{x}', x).replace('{y}', y);
+      console.log('🖼️ Fetching tile from GEE:', tileUrl);
+      
+      try {
         const tileResponse = await fetch(tileUrl);
         
         if (!tileResponse.ok) {
-          console.error('Tile fetch failed:', tileResponse.status, tileResponse.statusText);
+          console.error('❌ Tile fetch failed:', tileResponse.status, tileResponse.statusText);
           return new Response(
             JSON.stringify({ error: `Tile fetch failed: ${tileResponse.status}` }),
             { 
@@ -107,6 +136,8 @@ serve(async (req) => {
 
         // Return the tile data with appropriate headers
         const tileData = await tileResponse.arrayBuffer();
+        console.log('✅ Successfully fetched tile data, size:', tileData.byteLength);
+        
         return new Response(tileData, {
           headers: {
             ...corsHeaders,
@@ -116,7 +147,7 @@ serve(async (req) => {
         });
         
       } catch (error) {
-        console.error('Error fetching tile:', error);
+        console.error('❌ Error fetching tile from GEE:', error);
         return new Response(
           JSON.stringify({ error: `Tile fetch error: ${error.message}` }),
           { 
@@ -127,8 +158,8 @@ serve(async (req) => {
       }
     }
 
-    // If no tile coordinates, return our custom URL template directly
-    console.log('Returning custom URL template for:', dataset, year, month);
+    // If no tile coordinates, return the template URL that points to this function
+    console.log('📋 Returning tile URL template for:', dataset, year, month);
     
     // Return our custom URL that points back to this Supabase function
     const customTileUrl = `https://sereallctpcqrdjmvwrs.supabase.co/functions/v1/get-gee-tiles?dataset=${dataset}&year=${year}&month=${month}&z={z}&x={x}&y={y}`;
@@ -146,7 +177,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Error in get-gee-tiles function:', error);
+    console.error('❌ Error in get-gee-tiles function:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { 
