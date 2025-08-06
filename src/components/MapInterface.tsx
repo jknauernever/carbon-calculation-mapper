@@ -388,10 +388,12 @@ export const MapInterface = () => {
     const previewLayers = ['polygon-preview-fill', 'polygon-preview-outline'];
     previewLayers.forEach(layerId => {
       if (map.current?.getLayer(layerId)) {
+        console.log('Removing preview layer:', layerId);
         map.current.removeLayer(layerId);
       }
     });
     if (map.current.getSource('polygon-preview')) {
+      console.log('Removing preview source');
       map.current.removeSource('polygon-preview');
     }
     
@@ -399,12 +401,16 @@ export const MapInterface = () => {
     const polygonLayers = ['selected-area-fill', 'selected-area-outline'];
     polygonLayers.forEach(layerId => {
       if (map.current?.getLayer(layerId)) {
+        console.log('Removing completed polygon layer:', layerId);
         map.current.removeLayer(layerId);
       }
     });
     if (map.current.getSource('selected-area')) {
+      console.log('Removing completed polygon source');
       map.current.removeSource('selected-area');
     }
+    
+    console.log('✅ All drawing elements cleared');
   }, [clearDrawingMarkers]);
 
   const cancelDrawing = useCallback(() => {
@@ -489,16 +495,20 @@ export const MapInterface = () => {
   const startDrawing = () => {
     console.log('🎯 Starting drawing mode');
     
+    // Force clear everything first
+    console.log('🧹 Force clearing before starting new drawing');
+    clearAllDrawingElements();
+    
     // Ensure we start with completely clean state
     setCoordinates([]);
     setSelectedArea(null);
     setCarbonCalculation(null);
     
-    // Clear any existing polygons and markers
-    clearAllDrawingElements();
-    
-    setDrawingMode(true);
-    toast.info('Click points on the map to draw a polygon. Results update with each point (3+ required).');
+    // Small delay to ensure clearing is complete before starting
+    setTimeout(() => {
+      setDrawingMode(true);
+      toast.info('Click points on the map to draw a polygon. Results update with each point (3+ required).');
+    }, 100);
   };
 
   const calculateCarbonForArea = async () => {
@@ -509,16 +519,16 @@ export const MapInterface = () => {
   const clearMap = () => {
     if (!map.current) return;
 
-    console.log('🧹 Clearing entire map');
+    console.log('🧹 Clearing entire map - FORCE CLEAR');
+    
+    // Force clear all visual elements first
+    clearAllDrawingElements();
     
     // Clear drawing state completely
     setDrawingMode(false);
     setCoordinates([]);
     setSelectedArea(null);
     setCarbonCalculation(null);
-
-    // Clear all drawing elements
-    clearAllDrawingElements();
 
     // Clear dataset layers
     clearDatasetLayers();
@@ -527,6 +537,7 @@ export const MapInterface = () => {
     
     setActiveLayers({});
     
+    console.log('✅ Map completely cleared');
     toast.info('Map cleared');
   };
 
