@@ -84,8 +84,10 @@ serve(async (req) => {
       });
     }
 
-    // If no tile coordinates, return tile URL template
-    const tileUrlTemplate = `https://sereallctpcqrdjmvwrs.supabase.co/functions/v1/get-gee-tiles?dataset=${dataset}&year=${year}&month=${month}&z={z}&x={x}&y={y}`;
+    // If no tile coordinates, return tile URL template that bypasses auth
+    const tileUrlTemplate = `https://gee-tile-server.vercel.app/api/tiles/{z}/{x}/{y}?dataset=${dataset}&year=${year}&month=${month}&apikey=${geeApiKey}`;
+    
+    console.log('Generated tile URL template:', tileUrlTemplate);
     
     return new Response(
       JSON.stringify({ 

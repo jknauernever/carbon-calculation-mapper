@@ -17,3 +17,9 @@ verify_jwt = false
 
 [functions.gee-ndvi-node]
 verify_jwt = false
+
+[functions.get-gee-tiles]
+verify_jwt = false
+
+[functions.get-datasets]
+verify_jwt = false
