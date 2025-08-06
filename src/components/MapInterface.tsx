@@ -340,43 +340,24 @@ export const MapInterface = () => {
     try {
       console.log('Adding dataset layer:', dataset);
       
-      // Get current map bounds for tile request
-      const bounds = map.current.getBounds();
-      const bbox = [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()];
-      
-      // Construct API URL with dataset parameter
-      const apiUrl = new URL('https://gee-tile-server.vercel.app/api/tiles');
-      apiUrl.searchParams.set('dataset', dataset.id);
-      apiUrl.searchParams.set('bbox', bbox.join(','));
-      
-      console.log('Fetching tiles from:', apiUrl.toString());
-      
-      // Make API call to get tile URL and metadata
-      const response = await fetch(apiUrl.toString());
-      
-      if (!response.ok) {
-        throw new Error(`Tile API failed: ${response.status} ${response.statusText}`);
-      }
-      
-      const tileData = await response.json();
-      console.log('Tile API response:', tileData);
-      
-      if (!tileData.tileUrl) {
-        throw new Error('No tile URL in response');
-      }
-      
-      // Store metadata for display
-      setDatasetMetadata(tileData.metadata || null);
-      
-      // Clear existing dataset layers
+      // Clear existing dataset layers first
       clearDatasetLayers();
       
-      // Add tile source
+      // Use the XYZ tile URL format that the API expects
+      // The API requires: dataset, year, month, and apikey parameters
+      // For now using YOUR_API_KEY as placeholder - user needs to provide real key
+      const tileUrl = `https://gee-tile-server.vercel.app/api/tiles/{z}/{x}/{y}?dataset=${dataset.id}&year=2024&month=6&apikey=YOUR_API_KEY`;
+      
+      console.log('Tile URL pattern:', tileUrl);
+      
+      // Add tile source with proper XYZ format
       map.current.addSource('dataset-tiles', {
         type: 'raster',
-        tiles: [tileData.tileUrl],
+        tiles: [tileUrl],
         tileSize: 256,
-        attribution: tileData.attribution || 'Google Earth Engine'
+        minzoom: 0,
+        maxzoom: 18,
+        attribution: 'Google Earth Engine via GEE Tile Server'
       });
       
       // Add raster layer with appropriate styling
@@ -388,6 +369,16 @@ export const MapInterface = () => {
           'raster-opacity': 0.8,
           'raster-fade-duration': 300
         }
+      });
+      
+      // Set metadata from the datasets API response
+      setDatasetMetadata({
+        collection: dataset.parameters?.collection || 'Unknown',
+        band: dataset.parameters?.band || 'Unknown',
+        description: dataset.description,
+        category: dataset.category,
+        temporalResolution: dataset.parameters?.temporalResolution || 'Unknown',
+        spatialResolution: dataset.parameters?.spatialResolution || 'Unknown'
       });
       
       // Add event listeners for debugging
@@ -403,7 +394,7 @@ export const MapInterface = () => {
       map.current.on('error', (e: any) => {
         console.error('❌ Map tile error:', e);
         if (e.sourceId === 'dataset-tiles') {
-          toast.error('Failed to load dataset tiles');
+          toast.error('Failed to load dataset tiles - API key may be missing');
         }
       });
       
