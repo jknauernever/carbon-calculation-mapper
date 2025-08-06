@@ -644,9 +644,53 @@ export const MapInterface = () => {
       setTimeout(() => {
         const layer = map.current?.getLayer(layerId);
         const source = map.current?.getSource(sourceId);
-        console.log('Layer check:', { layer: !!layer, source: !!source });
-        console.log('Map layers:', map.current?.getStyle().layers.map(l => l.id));
-      }, 1000);
+        console.log('=== LAYER DEBUG INFO ===');
+        console.log('Layer exists:', !!layer);
+        console.log('Source exists:', !!source);
+        console.log('Layer ID searched:', layerId);
+        console.log('Source ID searched:', sourceId);
+        
+        if (layer) {
+          console.log('Layer details:', {
+            id: layer.id,
+            type: layer.type,
+            source: layer.source,
+            paint: layer.paint
+          });
+        }
+        
+        if (source) {
+          const rasterSource = source as any; // Type assertion for raster source
+          console.log('Source details:', {
+            type: rasterSource.type,
+            tiles: rasterSource.tiles,
+            tileSize: rasterSource.tileSize
+          });
+        }
+        
+        const allLayers = map.current?.getStyle().layers || [];
+        console.log('All map layers:', allLayers.map(l => ({ id: l.id, type: l.type })));
+        console.log('Looking for layer with ID:', layerId);
+        console.log('Map style loaded:', map.current?.isStyleLoaded());
+        console.log('=== END DEBUG INFO ===');
+        
+        // Test if tiles are actually loading by adding error/data listeners
+        map.current?.on('error', (e) => {
+          console.error('Map error:', e);
+        });
+        
+        map.current?.on('sourcedata', (e) => {
+          if (e.sourceId === sourceId) {
+            console.log('Source data event for', sourceId, ':', e);
+          }
+        });
+        
+        map.current?.on('data', (e: any) => {
+          if (e.sourceId === sourceId) {
+            console.log('Data event for', sourceId, ':', e);
+          }
+        });
+      }, 2000);
       
       // Add to active datasets
       setActiveDatasets(prev => ({
