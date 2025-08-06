@@ -85,12 +85,50 @@ serve(async (req) => {
     }
 
     // If no tile coordinates, return tile URL template
-    // Let's try the /api/tiles endpoint format from the documentation
+    // Based on the API docs, the correct format should be /api/tiles with query params
     const tileUrlTemplate = `https://gee-tile-server.vercel.app/api/tiles?dataset=${dataset}&year=${year}&month=${month}&apikey=${geeApiKey}&z={z}&x={x}&y={y}`;
     
     console.log('Generated tile URL template:', tileUrlTemplate);
     console.log('Dataset:', dataset, 'Year:', year, 'Month:', month);
     console.log('API Key present:', !!geeApiKey);
+    
+    // Test one specific tile URL to validate the format
+    const testUrl = `https://gee-tile-server.vercel.app/api/tiles?dataset=${dataset}&year=${year}&month=${month}&apikey=${geeApiKey}&z=5&x=10&y=12`;
+    console.log('Test tile URL:', testUrl);
+    
+    // Try fetching a test tile to validate the endpoint
+    try {
+      const testResponse = await fetch(testUrl);
+      console.log('Test response status:', testResponse.status);
+      console.log('Test response content-type:', testResponse.headers.get('content-type'));
+      
+      if (!testResponse.ok) {
+        const errorText = await testResponse.text();
+        console.error('Test tile error response:', errorText);
+        return new Response(
+          JSON.stringify({ 
+            error: `Tile API test failed: ${testResponse.status} - ${errorText}`,
+            testUrl: testUrl
+          }),
+          { 
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+    } catch (testError) {
+      console.error('Test tile fetch failed:', testError);
+      return new Response(
+        JSON.stringify({ 
+          error: `Tile API unreachable: ${testError.message}`,
+          testUrl: testUrl
+        }),
+        { 
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
     
     return new Response(
       JSON.stringify({ 
