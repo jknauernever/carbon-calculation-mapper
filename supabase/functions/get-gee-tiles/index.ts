@@ -54,7 +54,7 @@ serve(async (req) => {
       );
     }
 
-    // If z, x, y are provided, this is a tile request
+    // If z, x, y are provided, this is a tile request - proxy to the actual API
     if (z && x && y) {
       const tileUrl = `https://gee-tile-server.vercel.app/api/tiles/${z}/${x}/${y}?dataset=${dataset}&year=${year}&month=${month}&apikey=${geeApiKey}`;
       
@@ -84,33 +84,25 @@ serve(async (req) => {
       });
     }
 
-    // If no tile coordinates, return tile URL template
-    // Use the exact format from the API documentation: /api/tiles with {z}/{x}/{y} in the path
-    const tileUrlTemplate = `https://gee-tile-server.vercel.app/api/tiles/{z}/{x}/{y}?dataset=${dataset}&year=${year}&month=${month}&apikey=${geeApiKey}`;
+    // If no tile coordinates, get the tile URL from the API and return template
+    console.log('Getting tile URL from API for:', dataset, year, month);
     
-    console.log('Generated tile URL template:', tileUrlTemplate);
+    // Call the main API endpoint to get the tile URL
+    const apiUrl = `https://gee-tile-server.vercel.app/api/tiles?dataset=${dataset}&year=${year}&month=${month}&apikey=${geeApiKey}`;
+    console.log('Calling API:', apiUrl);
     
-    console.log('Generated tile URL template:', tileUrlTemplate);
-    console.log('Dataset:', dataset, 'Year:', year, 'Month:', month);
-    console.log('API Key present:', !!geeApiKey);
-    
-    // Test one specific tile URL to validate the format
-    const testUrl = `https://gee-tile-server.vercel.app/api/tiles/5/10/12?dataset=${dataset}&year=${year}&month=${month}&apikey=${geeApiKey}`;
-    console.log('Test tile URL:', testUrl);
-    
-    // Try fetching a test tile to validate the endpoint
     try {
-      const testResponse = await fetch(testUrl);
-      console.log('Test response status:', testResponse.status);
-      console.log('Test response content-type:', testResponse.headers.get('content-type'));
+      const apiResponse = await fetch(apiUrl);
+      console.log('API response status:', apiResponse.status);
+      console.log('API response content-type:', apiResponse.headers.get('content-type'));
       
-      if (!testResponse.ok) {
-        const errorText = await testResponse.text();
-        console.error('Test tile error response:', errorText);
+      if (!apiResponse.ok) {
+        const errorText = await apiResponse.text();
+        console.error('API error response:', errorText);
         return new Response(
           JSON.stringify({ 
-            error: `Tile API test failed: ${testResponse.status} - ${errorText}`,
-            testUrl: testUrl
+            error: `GEE API failed: ${apiResponse.status} - ${errorText}`,
+            apiUrl: apiUrl
           }),
           { 
             status: 500,
@@ -118,12 +110,49 @@ serve(async (req) => {
           }
         );
       }
-    } catch (testError) {
-      console.error('Test tile fetch failed:', testError);
+      
+      // Get the actual response from the API
+      const apiData = await apiResponse.json();
+      console.log('API response data:', apiData);
+      
+      // Check if the API returns a tile_url field
+      if (apiData.tile_url) {
+        // Use the tile URL returned by the API
+        console.log('Got tile URL from API:', apiData.tile_url);
+        return new Response(
+          JSON.stringify({ 
+            tileUrl: apiData.tile_url,
+            dataset,
+            year,
+            month,
+            debug: {
+              apiKeySet: !!geeApiKey,
+              originalResponse: apiData
+            }
+          }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      } else {
+        console.error('No tile_url in API response:', apiData);
+        return new Response(
+          JSON.stringify({ 
+            error: 'No tile_url in API response',
+            apiResponse: apiData
+          }),
+          { 
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+    } catch (apiError) {
+      console.error('API fetch failed:', apiError);
       return new Response(
         JSON.stringify({ 
-          error: `Tile API unreachable: ${testError.message}`,
-          testUrl: testUrl
+          error: `GEE API unreachable: ${apiError.message}`,
+          apiUrl: apiUrl
         }),
         { 
           status: 500,
@@ -131,22 +160,6 @@ serve(async (req) => {
         }
       );
     }
-    
-    return new Response(
-      JSON.stringify({ 
-        tileUrl: tileUrlTemplate,
-        dataset,
-        year,
-        month,
-        debug: {
-          apiKeySet: !!geeApiKey,
-          template: tileUrlTemplate
-        }
-      }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
 
   } catch (error) {
     console.error('Error in get-gee-tiles function:', error);
