@@ -37,7 +37,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { geometry, areaHectares } = await req.json();
+    const { geometry, areaHectares, propertyId } = await req.json();
 
     // Handle carbon calculation requests (geometry required)
     if (!geometry || !areaHectares) {
@@ -45,28 +45,42 @@ serve(async (req) => {
     }
 
     console.log('Processing carbon calculation for area:', areaHectares, 'hectares');
+    if (propertyId) {
+      console.log('Associated with property ID:', propertyId);
+    } else {
+      console.log('Direct polygon calculation (no property association)');
+    }
 
     // Calculate carbon using live GEE data
     const geeData = await calculateCarbonWithLiveGEE(geometry, areaHectares);
     console.log('GEE calculation completed:', geeData);
 
-    // Store calculation in database
-    const { data: calculation, error: dbError } = await supabase
-      .from('carbon_calculations')
-      .insert([{
-        total_co2e: geeData.total_co2e,
-        above_ground_biomass: geeData.above_ground_biomass,
-        below_ground_biomass: geeData.below_ground_biomass,
-        soil_organic_carbon: geeData.soil_organic_carbon,
-        calculation_method: geeData.calculation_method,
-        data_sources: geeData.data_sources,
-      }])
-      .select()
-      .single();
+    // Store calculation in database only if propertyId is provided
+    let calculation = null;
+    if (propertyId) {
+      const { data: calculation_data, error: dbError } = await supabase
+        .from('carbon_calculations')
+        .insert([{
+          property_id: propertyId,
+          total_co2e: geeData.total_co2e,
+          above_ground_biomass: geeData.above_ground_biomass,
+          below_ground_biomass: geeData.below_ground_biomass,
+          soil_organic_carbon: geeData.soil_organic_carbon,
+          calculation_method: geeData.calculation_method,
+          data_sources: geeData.data_sources,
+        }])
+        .select()
+        .single();
 
-    if (dbError) {
-      console.error('Database error:', dbError);
-      throw dbError;
+      if (dbError) {
+        console.error('Database error:', dbError);
+        throw dbError;
+      }
+      
+      calculation = calculation_data;
+      console.log('Results stored in database with ID:', calculation.id);
+    } else {
+      console.log('Skipping database storage - no property ID provided');
     }
 
     return new Response(
@@ -105,7 +119,7 @@ async function calculateCarbonWithLiveGEE(geometry: any, areaHectares: number): 
       throw new Error('Invalid geometry provided - missing coordinates');
     }
     
-    // Calculate center point of geometry for location-based data
+    // Calculate center point for location-based data
     const coords = geometry.coordinates[0];
     const centerLon = coords.reduce((sum: number, coord: number[]) => sum + coord[0], 0) / coords.length;
     const centerLat = coords.reduce((sum: number, coord: number[]) => sum + coord[1], 0) / coords.length;
