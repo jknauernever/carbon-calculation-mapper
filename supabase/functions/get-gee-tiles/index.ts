@@ -21,13 +21,28 @@ serve(async (req) => {
       );
     }
 
-    const url = new URL(req.url);
-    const dataset = url.searchParams.get('dataset');
-    const year = url.searchParams.get('year') || '2024';
-    const month = url.searchParams.get('month') || '6';
-    const z = url.searchParams.get('z');
-    const x = url.searchParams.get('x');
-    const y = url.searchParams.get('y');
+    let dataset, year, month, z, x, y;
+
+    // Handle both query parameters and request body
+    if (req.method === 'POST') {
+      const body = await req.json();
+      dataset = body.dataset;
+      year = body.year || '2024';
+      month = body.month || '6';
+      z = body.z;
+      x = body.x;
+      y = body.y;
+      console.log('POST body:', body);
+    } else {
+      const url = new URL(req.url);
+      dataset = url.searchParams.get('dataset');
+      year = url.searchParams.get('year') || '2024';
+      month = url.searchParams.get('month') || '6';
+      z = url.searchParams.get('z');
+      x = url.searchParams.get('x');
+      y = url.searchParams.get('y');
+      console.log('Query params:', { dataset, year, month, z, x, y });
+    }
 
     if (!dataset) {
       return new Response(
