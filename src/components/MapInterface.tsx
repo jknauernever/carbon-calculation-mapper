@@ -584,12 +584,12 @@ export const MapInterface = () => {
     
     setSelectedDataset(dataset);
     
-    // Check if dataset is already active
+    // Check if dataset is already active - if so, remove it first
     if (activeDatasets[dataset.id]) {
-      console.log('⚠️ Dataset already active:', dataset.name);
-      console.groupEnd();
-      toast.info(`${dataset.name} is already active`);
-      return;
+      console.log('🔄 Dataset already active, removing first:', dataset.name);
+      handleRemoveDataset(dataset.id);
+      // Wait a moment for cleanup
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
     
     console.log('✅ About to call addDatasetLayer...');
@@ -645,18 +645,23 @@ export const MapInterface = () => {
       const layerId = `dataset-layer-${datasetId}`;
       const sourceId = `dataset-tiles-${datasetId}`;
       
-      // Clean up existing layer
+      // Clean up existing layer and source
       try {
         if (map.current.getLayer(layerId)) {
           console.log('🧹 Removing existing layer:', layerId);
           map.current.removeLayer(layerId);
         }
+      } catch (layerError) {
+        console.warn('⚠️ Layer cleanup warning:', layerError);
+      }
+      
+      try {
         if (map.current.getSource(sourceId)) {
           console.log('🧹 Removing existing source:', sourceId);
           map.current.removeSource(sourceId);
         }
-      } catch (cleanupError) {
-        console.warn('⚠️ Cleanup warning:', cleanupError);
+      } catch (sourceError) {
+        console.warn('⚠️ Source cleanup warning:', sourceError);
       }
       
       // Get tile URL from edge function
