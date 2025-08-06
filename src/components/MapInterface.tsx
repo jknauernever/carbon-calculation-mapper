@@ -643,9 +643,10 @@ export const MapInterface = () => {
         paint: {
           'raster-opacity': opacity,
           'raster-fade-duration': 300,
-          'raster-contrast': 0.2,
-          'raster-brightness-min': 0.1,
-          'raster-saturation': 1.2
+          'raster-contrast': 0.3, // Increased contrast for better visibility
+          'raster-brightness-min': 0.0, // Ensure full brightness range
+          'raster-brightness-max': 1.0,
+          'raster-saturation': 1.5 // Increased saturation for better visibility
         }
       }, beforeId);
       
@@ -678,13 +679,30 @@ export const MapInterface = () => {
       });
       
       // Zoom to a location where data is likely to be visible
-      if (dataset.id === 'ndvi') {
+      if (dataset.id === 'ndvi' || dataset.id === 'evi') {
+        // Agricultural regions with high vegetation
         map.current.flyTo({
-          center: [-95.0, 39.0], // Central US - agricultural area
+          center: [-94.0, 40.0], // Iowa/Nebraska - major corn belt
+          zoom: 10,
+          duration: 2000
+        });
+        toast.success(`✅ ${dataset.name} layer added - Zooming to agricultural area`);
+      } else if (dataset.id === 'temperature') {
+        // Show temperature variation
+        map.current.flyTo({
+          center: [-110.0, 45.0], // Rocky Mountain region - good temperature variation
           zoom: 8,
           duration: 2000
         });
-        toast.success(`✅ ${dataset.name} layer added - Zooming to data area`);
+        toast.success(`✅ ${dataset.name} layer added - Zooming to temperature variation area`);
+      } else if (dataset.id === 'ndwi') {
+        // Water bodies
+        map.current.flyTo({
+          center: [-89.0, 46.5], // Great Lakes region
+          zoom: 8,
+          duration: 2000
+        });
+        toast.success(`✅ ${dataset.name} layer added - Zooming to water bodies`);
       } else {
         toast.success(`✅ ${dataset.name} layer added successfully`);
       }
