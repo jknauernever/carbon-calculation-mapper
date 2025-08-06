@@ -24,17 +24,32 @@ serve(async (req) => {
     }
     
     const data = await response.json();
-    console.log('Datasets fetched successfully:', data);
+    console.log('Raw API response:', data);
     
-    // Ensure we return the data in the expected format
-    const datasets = Array.isArray(data.datasets) ? data.datasets : 
-                    Array.isArray(data) ? data : [];
+    // Transform the datasets object into an array format expected by frontend
+    const datasetsObj = data.datasets || {};
+    const datasets = Object.entries(datasetsObj).map(([key, dataset]: [string, any]) => ({
+      id: key,
+      name: key.toUpperCase(), // Convert 'ndvi' to 'NDVI', etc.
+      description: dataset.description || '',
+      category: dataset.category || 'Other',
+      collection: dataset.collection || '',
+      band: dataset.band || '',
+      temporalResolution: dataset.temporalResolution || '',
+      spatialResolution: dataset.spatialResolution || '',
+      defaultPalette: dataset.defaultPalette || '',
+      min: dataset.min || 0,
+      max: dataset.max || 100
+    }));
+    
+    console.log('Transformed datasets:', datasets);
     
     return new Response(
       JSON.stringify({ 
         datasets,
         count: datasets.length,
-        success: true
+        success: true,
+        categories: data.categories || []
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
