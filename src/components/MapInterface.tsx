@@ -50,6 +50,8 @@ export const MapInterface = () => {
   const [clickedCoordinates, setClickedCoordinates] = useState<[number, number] | null>(null);
   const [activePanel, setActivePanel] = useState<'carbon' | 'ndvi'>('carbon');
   const [selectedDataset, setSelectedDataset] = useState<Dataset | null>(null);
+  const [datasetMetadata, setDatasetMetadata] = useState<any>(null);
+  const [tileLoading, setTileLoading] = useState(false);
 
   // Initialize map with Mapbox token from Supabase
   useEffect(() => {
@@ -241,6 +243,11 @@ export const MapInterface = () => {
       map.current.removeSource('selected-area');
     }
 
+    // Clear dataset layers
+    clearDatasetLayers();
+    setSelectedDataset(null);
+    setDatasetMetadata(null);
+    
     setActiveLayers({});
   };
 
@@ -294,13 +301,133 @@ export const MapInterface = () => {
     toast.success(`Searching for: ${searchAddress}`);
   };
 
-  const handleDatasetSelect = (dataset: Dataset) => {
+  const handleDatasetSelect = async (dataset: Dataset) => {
     setSelectedDataset(dataset);
     console.log('Selected dataset:', dataset);
     toast.success(`Dataset selected: ${dataset.name}`);
     
-    // TODO: Update tile requests with selected dataset parameter
-    // This will be used when integrating with your Vercel tile API
+    // Clear existing dataset layers
+    clearDatasetLayers();
+    
+    // Add new dataset layer to map
+    await addDatasetLayer(dataset);
+  };
+
+  const clearDatasetLayers = () => {
+    if (!map.current) return;
+    
+    // Remove any existing dataset layers
+    const layersToRemove = ['dataset-layer', 'dataset-layer-source'];
+    layersToRemove.forEach(layerId => {
+      if (map.current?.getLayer(layerId)) {
+        map.current.removeLayer(layerId);
+      }
+    });
+    
+    if (map.current.getSource('dataset-tiles')) {
+      map.current.removeSource('dataset-tiles');
+    }
+  };
+
+  const addDatasetLayer = async (dataset: Dataset) => {
+    if (!map.current || !isMapLoaded) {
+      toast.error('Map not ready');
+      return;
+    }
+
+    setTileLoading(true);
+    
+    try {
+      console.log('Adding dataset layer:', dataset);
+      
+      // Get current map bounds for tile request
+      const bounds = map.current.getBounds();
+      const bbox = [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()];
+      
+      // Construct API URL with dataset parameter
+      const apiUrl = new URL('https://gee-tile-server.vercel.app/api/tiles');
+      apiUrl.searchParams.set('dataset', dataset.id);
+      apiUrl.searchParams.set('bbox', bbox.join(','));
+      
+      console.log('Fetching tiles from:', apiUrl.toString());
+      
+      // Make API call to get tile URL and metadata
+      const response = await fetch(apiUrl.toString());
+      
+      if (!response.ok) {
+        throw new Error(`Tile API failed: ${response.status} ${response.statusText}`);
+      }
+      
+      const tileData = await response.json();
+      console.log('Tile API response:', tileData);
+      
+      if (!tileData.tileUrl) {
+        throw new Error('No tile URL in response');
+      }
+      
+      // Store metadata for display
+      setDatasetMetadata(tileData.metadata || null);
+      
+      // Clear existing dataset layers
+      clearDatasetLayers();
+      
+      // Add tile source
+      map.current.addSource('dataset-tiles', {
+        type: 'raster',
+        tiles: [tileData.tileUrl],
+        tileSize: 256,
+        attribution: tileData.attribution || 'Google Earth Engine'
+      });
+      
+      // Add raster layer with appropriate styling
+      map.current.addLayer({
+        id: 'dataset-layer',
+        type: 'raster',
+        source: 'dataset-tiles',
+        paint: {
+          'raster-opacity': 0.8,
+          'raster-fade-duration': 300
+        }
+      });
+      
+      // Add event listeners for debugging
+      map.current.on('sourcedata', (e) => {
+        if (e.sourceId === 'dataset-tiles') {
+          if (e.isSourceLoaded) {
+            console.log('✅ Dataset tiles loaded successfully');
+            toast.success('Dataset layer loaded');
+          }
+        }
+      });
+      
+      map.current.on('error', (e: any) => {
+        console.error('❌ Map tile error:', e);
+        if (e.sourceId === 'dataset-tiles') {
+          toast.error('Failed to load dataset tiles');
+        }
+      });
+      
+      console.log('✅ Dataset layer added successfully');
+      
+    } catch (error) {
+      console.error('Error adding dataset layer:', error);
+      toast.error(`Failed to load dataset: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setTileLoading(false);
+    }
+  };
+
+  const getColorPalette = (category: string) => {
+    const palettes: Record<string, string[]> = {
+      'Vegetation': ['#8B4513', '#DAA520', '#9ACD32', '#32CD32', '#006400'],
+      'Water': ['#E6F3FF', '#CCE7FF', '#99D6FF', '#4169E1', '#000080'],
+      'Climate': ['#4169E1', '#1E90FF', '#FFD700', '#FF8C00', '#DC143C'],
+      'Temperature': ['#000080', '#4169E1', '#FFD700', '#FF8C00', '#DC143C'],
+      'Precipitation': ['#F5F5DC', '#87CEEB', '#4169E1', '#0000CD', '#000080'],
+      'Landcover': ['#8B4513', '#DAA520', '#9ACD32', '#32CD32', '#4169E1'],
+      'Other': ['#696969', '#808080', '#A9A9A9', '#C0C0C0', '#D3D3D3']
+    };
+    return palettes[category] || palettes['Other'];
   };
 
 
@@ -373,9 +500,79 @@ export const MapInterface = () => {
                   onDatasetSelect={handleDatasetSelect}
                   selectedDataset={selectedDataset}
                 />
-                <div className="text-center p-4 text-muted-foreground">
-                  <p>Map layers will be integrated with your Vercel tile API service.</p>
-                </div>
+                
+                {tileLoading && (
+                  <div className="flex items-center justify-center p-4 bg-muted/50 rounded-lg">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mr-2"></div>
+                    <span>Loading dataset tiles...</span>
+                  </div>
+                )}
+                
+                {selectedDataset && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-sm">
+                        <MapPin className="h-4 w-4" />
+                        Dataset Info
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div>
+                        <h4 className="font-medium text-sm">{selectedDataset.name}</h4>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {selectedDataset.description}
+                        </p>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium">Category:</span>
+                        <span className="text-xs px-2 py-1 bg-secondary rounded">
+                          {selectedDataset.category}
+                        </span>
+                      </div>
+                      
+                      {datasetMetadata && (
+                        <div className="space-y-2">
+                          <h5 className="font-medium text-xs">Metadata</h5>
+                          <div className="text-xs space-y-1">
+                            {datasetMetadata.dateRange && (
+                              <div>
+                                <span className="font-medium">Date Range: </span>
+                                {datasetMetadata.dateRange}
+                              </div>
+                            )}
+                            {datasetMetadata.resolution && (
+                              <div>
+                                <span className="font-medium">Resolution: </span>
+                                {datasetMetadata.resolution}
+                              </div>
+                            )}
+                            {datasetMetadata.units && (
+                              <div>
+                                <span className="font-medium">Units: </span>
+                                {datasetMetadata.units}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      
+                      <div className="space-y-2">
+                        <h5 className="font-medium text-xs">Color Palette</h5>
+                        <div className="flex gap-1">
+                          {getColorPalette(selectedDataset.category).map((color, index) => (
+                            <div
+                              key={index}
+                              className="w-4 h-4 rounded"
+                              style={{ backgroundColor: color }}
+                              title={color}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
             )}
             
