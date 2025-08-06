@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, ChevronRight, Database, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Dataset {
   id: string;
@@ -37,14 +38,12 @@ export const DatasetSelector: React.FC<DatasetSelectorProps> = ({
       setLoading(true);
       setError(null);
       
-      console.log('Fetching datasets from Vercel API...');
-      const response = await fetch('https://gee-tile-server.vercel.app/api/datasets');
+      console.log('Fetching datasets via Supabase edge function...');
+      const { data, error } = await supabase.functions.invoke('get-datasets');
       
-      if (!response.ok) {
-        throw new Error(`Failed to fetch datasets: ${response.status} ${response.statusText}`);
+      if (error) {
+        throw new Error(`Supabase function error: ${error.message}`);
       }
-      
-      const data = await response.json();
       console.log('API Response:', data);
       
       // Ensure we have a valid array of datasets
@@ -64,7 +63,7 @@ export const DatasetSelector: React.FC<DatasetSelectorProps> = ({
     } catch (error) {
       console.error('Error fetching datasets:', error);
       setError(error instanceof Error ? error.message : 'Failed to fetch datasets');
-      toast.error('Failed to load datasets from Vercel API');
+      toast.error('Failed to load datasets from API');
       // Ensure datasets is always an array even on error
       setDatasets([]);
     } finally {
