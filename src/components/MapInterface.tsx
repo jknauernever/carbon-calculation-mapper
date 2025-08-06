@@ -602,14 +602,17 @@ export const MapInterface = () => {
         attribution: 'Google Earth Engine via GEE Tile Server'
       });
       
-      // Add raster layer with appropriate styling
+      // Add raster layer with appropriate styling - increased opacity for visibility
       map.current.addLayer({
         id: 'dataset-layer',
         type: 'raster',
         source: 'dataset-tiles',
         paint: {
-          'raster-opacity': 0.8,
-          'raster-fade-duration': 300
+          'raster-opacity': 1.0, // Increased to full opacity
+          'raster-fade-duration': 300,
+          'raster-contrast': 0.2, // Add some contrast
+          'raster-brightness-min': 0.1, // Enhance brightness
+          'raster-saturation': 1.2 // Boost saturation for visibility
         }
       });
       
@@ -623,12 +626,41 @@ export const MapInterface = () => {
         spatialResolution: dataset.parameters?.spatialResolution || 'Unknown'
       });
       
+      console.log('✅ Dataset layer added successfully to map:', {
+        layerId: 'dataset-layer',
+        sourceId: 'dataset-tiles',
+        tileUrl: data.tileUrl,
+        dataset: dataset.name,
+        opacity: 1.0
+      });
+      
+      // Zoom to a location where NDVI data is likely to be visible
+      if (dataset.id === 'ndvi') {
+        map.current.flyTo({
+          center: [-95.0, 39.0], // Central US - agricultural area
+          zoom: 8,
+          duration: 2000
+        });
+        toast.success(`✅ ${dataset.name} tiles loaded - Zooming to data area`);
+      } else {
+        toast.success(`✅ ${dataset.name} tiles loaded successfully`);
+      }
+      
       // Add event listeners for debugging
       map.current.on('sourcedata', (e) => {
         if (e.sourceId === 'dataset-tiles') {
           if (e.isSourceLoaded) {
             console.log('✅ Dataset tiles loaded successfully');
-            toast.success('Dataset layer loaded');
+            
+            // Check if layer is visible
+            const layer = map.current?.getLayer('dataset-layer');
+            const source = map.current?.getSource('dataset-tiles');
+            console.log('Layer visibility check:', {
+              layerExists: !!layer,
+              sourceExists: !!source,
+              mapLoaded: isMapLoaded,
+              zoom: map.current?.getZoom()
+            });
           }
         }
       });
@@ -639,8 +671,6 @@ export const MapInterface = () => {
           toast.error('Failed to load dataset tiles - API key may be missing');
         }
       });
-      
-      console.log('✅ Dataset layer added successfully');
       
     } catch (error) {
       console.error('Error adding dataset layer:', error);
