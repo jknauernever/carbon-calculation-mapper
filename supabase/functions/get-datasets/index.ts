@@ -10,7 +10,20 @@ serve(async (req) => {
   try {
     console.log('Fetching datasets from Vercel API...');
     
-    const response = await fetch('https://gee-tile-server.vercel.app/api/datasets');
+    // Get API key from environment
+    const apiKey = Deno.env.get('GEE_TILE_SERVER_API_KEY');
+    if (!apiKey) {
+      console.error('GEE_TILE_SERVER_API_KEY environment variable not set');
+      return new Response(
+        JSON.stringify({ error: 'API key not configured' }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+    
+    const response = await fetch(`https://gee-tile-server.vercel.app/api/datasets?apikey=${apiKey}`);
     
     if (!response.ok) {
       console.error('Vercel API error:', response.status, response.statusText);
