@@ -61,25 +61,26 @@ export const MapInterface = () => {
   useEffect(() => {
     const fetchMapboxToken = async () => {
       try {
-        console.log('Fetching Mapbox token...');
+        console.log('🔑 Fetching Mapbox token...');
         const { data, error } = await supabase.functions.invoke('get-mapbox-token');
         
         if (error) {
-          console.error('Supabase function error:', error);
-          throw error;
+          console.error('❌ Supabase function error:', error);
+          toast.error('Failed to get Mapbox token. Check Supabase secrets.');
+          return;
         }
         
         if (data?.token) {
-          console.log('Mapbox token received successfully');
+          console.log('✅ Mapbox token received');
           setMapboxToken(data.token);
           initializeMap(data.token);
         } else {
-          console.error('No token in response:', data);
-          toast.error('Mapbox token not found. Please add MAPBOX_PUBLIC_TOKEN to Supabase Edge Function secrets.');
+          console.error('❌ No token in response:', data);
+          toast.error('Mapbox token not configured. Please add MAPBOX_PUBLIC_TOKEN to Supabase Edge Function secrets.');
         }
       } catch (error) {
-        console.error('Error fetching Mapbox token:', error);
-        toast.error('Failed to load map. Please configure Mapbox token in Supabase secrets.');
+        console.error('❌ Error fetching Mapbox token:', error);
+        toast.error('Network error loading map token');
       }
     };
 
@@ -87,45 +88,71 @@ export const MapInterface = () => {
   }, []);
 
   const initializeMap = useCallback((token?: string) => {
-    console.log('🚀 initializeMap called');
-    if (!mapContainer.current || map.current) {
-      console.log('❌ Map container not ready or map already exists');
+    console.log('🚀 Starting map initialization');
+    
+    if (!mapContainer.current) {
+      console.log('❌ Map container not available');
+      return;
+    }
+    
+    if (map.current) {
+      console.log('ℹ️ Map already exists, skipping initialization');
       return;
     }
 
     const mapboxAccessToken = token || mapboxToken;
     if (!mapboxAccessToken) {
       console.error('❌ No Mapbox token available');
+      toast.error('Map token missing');
       return;
     }
 
-    console.log('🗺️ Initializing Mapbox map...');
-    mapboxgl.accessToken = mapboxAccessToken;
+    try {
+      console.log('🗺️ Creating Mapbox map instance');
+      mapboxgl.accessToken = mapboxAccessToken;
 
-    map.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: getMapStyle(selectedBaseMap),
-      center: [0, 0], // World center
-      zoom: 2,
-      projection: 'mercator'
-    });
+      map.current = new mapboxgl.Map({
+        container: mapContainer.current,
+        style: getMapStyle(selectedBaseMap),
+        center: [0, 0],
+        zoom: 2,
+        projection: 'mercator',
+        antialias: true,
+        preserveDrawingBuffer: true
+      });
 
-    console.log('🎮 Adding map controls...');
-    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
-    map.current.addControl(new mapboxgl.ScaleControl(), 'bottom-left');
+      // Add controls
+      map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+      map.current.addControl(new mapboxgl.ScaleControl(), 'bottom-left');
 
-    map.current.on('load', () => {
-      console.log('🗺️ Map loaded successfully');
-      setIsMapLoaded(true);
+      // Handle successful load
+      map.current.on('load', () => {
+        console.log('✅ Map loaded successfully');
+        setIsMapLoaded(true);
+        toast.success('Map loaded');
+      });
+
+      // Enhanced error handling
+      map.current.on('error', (e) => {
+        console.error('❌ Map error:', e);
+        if (e.error?.message?.includes('token')) {
+          toast.error('Invalid Mapbox token');
+        } else {
+          toast.error('Map loading error');
+        }
+      });
+
+      // Style loading events
+      map.current.on('styledata', () => {
+        console.log('🎨 Map style loaded');
+      });
+
       console.log('✅ Map initialization complete');
-    });
-
-    map.current.on('error', (e) => {
-      console.error('❌ Map error:', e);
-      toast.error('Map failed to load properly');
-    });
-
-    console.log('✅ Map setup complete');
+      
+    } catch (error) {
+      console.error('❌ Map initialization failed:', error);
+      toast.error('Failed to initialize map');
+    }
   }, [mapboxToken, selectedBaseMap]);
 
   // Handle map resize when sidebar toggles or window resizes
@@ -571,28 +598,42 @@ export const MapInterface = () => {
   };
 
   const addDatasetLayer = async (dataset: Dataset, datasetId: string = dataset.id, opacity: number = 1.0) => {
-    if (!map.current || !isMapLoaded) {
+    console.log('🔄 Adding dataset layer:', dataset.name);
+    
+    if (!map.current) {
+      console.error('❌ Map not initialized');
       toast.error('Map not ready');
+      return;
+    }
+
+    if (!isMapLoaded) {
+      console.error('❌ Map not loaded yet');
+      toast.error('Please wait for map to load');
       return;
     }
 
     setTileLoading(true);
     
     try {
-      console.log('Adding dataset layer:', dataset);
-      
       const layerId = `dataset-layer-${datasetId}`;
       const sourceId = `dataset-tiles-${datasetId}`;
       
-      // Clear existing layer if it exists
-      if (map.current.getLayer(layerId)) {
-        map.current.removeLayer(layerId);
-      }
-      if (map.current.getSource(sourceId)) {
-        map.current.removeSource(sourceId);
+      // Clean up existing layer
+      try {
+        if (map.current.getLayer(layerId)) {
+          console.log('🧹 Removing existing layer:', layerId);
+          map.current.removeLayer(layerId);
+        }
+        if (map.current.getSource(sourceId)) {
+          console.log('🧹 Removing existing source:', sourceId);
+          map.current.removeSource(sourceId);
+        }
+      } catch (cleanupError) {
+        console.warn('⚠️ Cleanup warning:', cleanupError);
       }
       
-      // Get tile URL template from our secure edge function
+      // Get tile URL from edge function
+      console.log('🌐 Requesting tile URL from edge function');
       const { data, error } = await supabase.functions.invoke('get-gee-tiles', {
         body: {
           dataset: dataset.id,
@@ -602,54 +643,58 @@ export const MapInterface = () => {
       });
 
       if (error) {
-        throw new Error(`Edge function error: ${error.message}`);
+        console.error('❌ Edge function error:', error);
+        throw new Error(`API Error: ${error.message || 'Unknown error'}`);
       }
 
       if (!data?.tileUrl) {
-        throw new Error('No tile URL received from edge function');
+        console.error('❌ No tile URL in response:', data);
+        throw new Error('No tile URL received - check GEE configuration');
       }
 
-      console.log('Tile URL template received:', data.tileUrl);
+      console.log('✅ Tile URL received:', data.tileUrl);
       
-      // Add tile source with the secure tile URL
+      // Add tile source
+      console.log('🗺️ Adding tile source:', sourceId);
       map.current.addSource(sourceId, {
         type: 'raster',
         tiles: [data.tileUrl],
         tileSize: 256,
         minzoom: 0,
-        maxzoom: 18,
-        attribution: 'Google Earth Engine via GEE Tile Server'
+        maxzoom: 15,
+        attribution: 'Google Earth Engine'
       });
       
-      // Add raster layer with dynamic opacity
-      // Find the best layer to insert before (labels should be on top)
-      const layers = map.current.getStyle().layers;
+      // Find insertion point (before labels)
       let beforeId: string | undefined;
-      
-      // Look for label layers to insert before them
-      for (const layer of layers) {
-        if (layer.id.includes('label') || layer.id.includes('text') || layer.id.includes('symbol')) {
-          beforeId = layer.id;
-          break;
+      try {
+        const style = map.current.getStyle();
+        if (style?.layers) {
+          for (const layer of style.layers) {
+            if (layer.id.includes('label') || layer.id.includes('text') || layer.id.includes('symbol')) {
+              beforeId = layer.id;
+              break;
+            }
+          }
         }
+      } catch (styleError) {
+        console.warn('⚠️ Could not determine layer order:', styleError);
       }
       
-      console.log('Adding dataset layer before:', beforeId || 'top');
+      console.log('🎨 Adding raster layer:', layerId, beforeId ? `before ${beforeId}` : 'at top');
       
+      // Add raster layer
       map.current.addLayer({
         id: layerId,
         type: 'raster',
         source: sourceId,
         paint: {
           'raster-opacity': opacity,
-          'raster-fade-duration': 300,
-          'raster-contrast': 0.2,
-          'raster-brightness-min': 0.1,
-          'raster-saturation': 1.2
+          'raster-fade-duration': 300
         }
       }, beforeId);
       
-      // Add to active datasets
+      // Update state
       setActiveDatasets(prev => ({
         ...prev,
         [datasetId]: {
@@ -659,7 +704,7 @@ export const MapInterface = () => {
         }
       }));
       
-      // Set metadata from the datasets API response
+      // Set metadata
       setDatasetMetadata({
         collection: dataset.parameters?.collection || 'Unknown',
         band: dataset.parameters?.band || 'Unknown',
@@ -669,45 +714,48 @@ export const MapInterface = () => {
         spatialResolution: dataset.parameters?.spatialResolution || 'Unknown'
       });
       
-      console.log('✅ Dataset layer added successfully to map:', {
+      console.log('✅ Layer added successfully:', {
         layerId,
         sourceId,
-        tileUrl: data.tileUrl,
         dataset: dataset.name,
         opacity
       });
       
-      // Zoom to a location where data is likely to be visible
+      // Zoom to data area for NDVI
       if (dataset.id === 'ndvi') {
+        console.log('🎯 Zooming to NDVI data area');
         map.current.flyTo({
-          center: [-95.0, 39.0], // Central US - agricultural area
+          center: [-95.0, 39.0], // Central US
           zoom: 8,
           duration: 2000
         });
-        toast.success(`✅ ${dataset.name} layer added - Zooming to data area`);
+        toast.success(`${dataset.name} layer added - Zooming to data area`);
       } else {
-        toast.success(`✅ ${dataset.name} layer added successfully`);
+        toast.success(`${dataset.name} layer added successfully`);
       }
       
-      // Add event listeners for debugging this specific layer
-      map.current.on('sourcedata', (e) => {
-        if (e.sourceId === sourceId) {
-          if (e.isSourceLoaded) {
-            console.log('✅ Dataset tiles loaded successfully for', dataset.name);
-          }
+      // Add source monitoring
+      const handleSourceData = (e: any) => {
+        if (e.sourceId === sourceId && e.isSourceLoaded) {
+          console.log('✅ Tiles loaded for:', dataset.name);
+          map.current?.off('sourcedata', handleSourceData);
         }
-      });
+      };
       
-      map.current.on('error', (e: any) => {
-        console.error('❌ Map tile error:', e);
-        if (e.sourceId === 'dataset-tiles') {
-          toast.error('Failed to load dataset tiles - API key may be missing');
+      const handleTileError = (e: any) => {
+        console.error('❌ Tile load error:', e);
+        if (e.sourceId === sourceId) {
+          toast.error(`Failed to load ${dataset.name} tiles`);
         }
-      });
+      };
+      
+      map.current.on('sourcedata', handleSourceData);
+      map.current.on('error', handleTileError);
       
     } catch (error) {
-      console.error('Error adding dataset layer:', error);
-      toast.error(`Failed to load dataset: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('❌ Failed to add dataset layer:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(`Failed to load ${dataset.name}: ${errorMsg}`);
     } finally {
       setTileLoading(false);
     }
