@@ -688,17 +688,19 @@ export const MapInterface = () => {
         if (map.current?.getLayer(layerId)) {
           console.log('✅ Layer confirmed visible:', layerId);
           console.log('🎨 Layer paint properties:', map.current.getPaintProperty(layerId, 'raster-opacity'));
+          console.log('👁️ Layer visibility:', map.current.getLayoutProperty(layerId, 'visibility'));
+          console.log('🗺️ Layer source:', map.current.getLayer(layerId).source);
         } else {
           console.error('❌ Layer not found after adding:', layerId);
         }
       }, 1000);
       
-      // Update state
+      // Update state with full opacity
       setActiveDatasets(prev => ({
         ...prev,
         [datasetId]: {
           dataset,
-          opacity,
+          opacity: 1.0, // Always full opacity
           visible: true
         }
       }));
