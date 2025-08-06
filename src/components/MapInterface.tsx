@@ -221,59 +221,8 @@ export const MapInterface = () => {
   };
 
   const handleBaseMapChange = (baseMapId: string) => {
-    setSelectedBaseMap(baseMapId);
-    
-    if (map.current) {
-      const newStyle = getMapStyle(baseMapId);
-      map.current.setStyle(newStyle);
-      
-      // Re-add dataset layers after style change
-      map.current.once('styledata', () => {
-        // Re-add all active datasets
-        Object.entries(activeDatasets).forEach(([datasetId, activeDataset]) => {
-          if (activeDataset.visible) {
-            addDatasetLayer(activeDataset.dataset, datasetId, activeDataset.opacity);
-          }
-        });
-        // Re-add selected area if it exists
-        if (selectedArea) {
-          const closedCoords = [...selectedArea.coordinates, selectedArea.coordinates[0]];
-          const polygonGeoJSON = {
-            type: 'Feature' as const,
-            properties: {},
-            geometry: {
-              type: 'Polygon' as const,
-              coordinates: [closedCoords]
-            }
-          };
-
-          map.current?.addSource('selected-area', {
-            type: 'geojson',
-            data: polygonGeoJSON
-          });
-
-          map.current?.addLayer({
-            id: 'selected-area-fill',
-            type: 'fill',
-            source: 'selected-area',
-            paint: {
-              'fill-color': '#3b82f6',
-              'fill-opacity': 0.3
-            }
-          });
-
-          map.current?.addLayer({
-            id: 'selected-area-outline',
-            type: 'line',
-            source: 'selected-area',
-            paint: {
-              'line-color': '#2563eb',
-              'line-width': 2
-            }
-          });
-        }
-      });
-    }
+    console.log('🎨 Base map change disabled - keeping white background');
+    // Disabled to show only NDVI tiles
   };
 
   // Helper functions first (no dependencies)
