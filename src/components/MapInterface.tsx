@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { GEELayerToggle } from "./GEELayerToggle";
 import { DatasetSelector } from "./DatasetSelector";
 import { CarbonResults } from "./CarbonResults";
+import { BaseMapSelector } from "./BaseMapSelector";
 import { GEEDataVisualization } from "./GEEDataVisualization";
 
 
@@ -50,6 +51,7 @@ export const MapInterface = () => {
   const [selectedDataset, setSelectedDataset] = useState<Dataset | null>(null);
   const [datasetMetadata, setDatasetMetadata] = useState<any>(null);
   const [tileLoading, setTileLoading] = useState(false);
+  const [selectedBaseMap, setSelectedBaseMap] = useState<string>('satellite');
 
   // Initialize map with Mapbox token from Supabase
   useEffect(() => {
@@ -93,7 +95,7 @@ export const MapInterface = () => {
 
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/satellite-v9',
+      style: getMapStyle(selectedBaseMap),
       center: [0, 0], // World center
       zoom: 2,
       projection: 'mercator'
@@ -132,6 +134,85 @@ export const MapInterface = () => {
       clearTimeout(timeoutId);
     };
   }, [sidebarCollapsed]);
+
+  const getMapStyle = (baseMapId: string) => {
+    const baseMapOptions: Record<string, string> = {
+      'none': 'data:application/json;base64,' + btoa(JSON.stringify({
+        version: 8,
+        sources: {},
+        layers: [{
+          id: 'background',
+          type: 'background',
+          paint: {
+            'background-color': '#ffffff'
+          }
+        }]
+      })),
+      'streets': 'mapbox://styles/mapbox/streets-v12',
+      'outdoors': 'mapbox://styles/mapbox/outdoors-v12',
+      'light': 'mapbox://styles/mapbox/light-v11',
+      'dark': 'mapbox://styles/mapbox/dark-v11',
+      'satellite': 'mapbox://styles/mapbox/satellite-v9',
+      'satellite-streets': 'mapbox://styles/mapbox/satellite-streets-v12',
+      'navigation-day': 'mapbox://styles/mapbox/navigation-day-v1',
+      'navigation-night': 'mapbox://styles/mapbox/navigation-night-v1'
+    };
+    
+    return baseMapOptions[baseMapId] || baseMapOptions['satellite'];
+  };
+
+  const handleBaseMapChange = (baseMapId: string) => {
+    setSelectedBaseMap(baseMapId);
+    
+    if (map.current) {
+      const newStyle = getMapStyle(baseMapId);
+      map.current.setStyle(newStyle);
+      
+      // Re-add dataset layers after style change
+      map.current.once('styledata', () => {
+        if (selectedDataset) {
+          addDatasetLayer(selectedDataset);
+        }
+        // Re-add selected area if it exists
+        if (selectedArea) {
+          const closedCoords = [...selectedArea.coordinates, selectedArea.coordinates[0]];
+          const polygonGeoJSON = {
+            type: 'Feature' as const,
+            properties: {},
+            geometry: {
+              type: 'Polygon' as const,
+              coordinates: [closedCoords]
+            }
+          };
+
+          map.current?.addSource('selected-area', {
+            type: 'geojson',
+            data: polygonGeoJSON
+          });
+
+          map.current?.addLayer({
+            id: 'selected-area-fill',
+            type: 'fill',
+            source: 'selected-area',
+            paint: {
+              'fill-color': '#3b82f6',
+              'fill-opacity': 0.3
+            }
+          });
+
+          map.current?.addLayer({
+            id: 'selected-area-outline',
+            type: 'line',
+            source: 'selected-area',
+            paint: {
+              'line-color': '#2563eb',
+              'line-width': 2
+            }
+          });
+        }
+      });
+    }
+  };
 
   const addMapEventListeners = () => {
     if (!map.current) return;
@@ -583,8 +664,12 @@ export const MapInterface = () => {
               </Button>
             </div>
 
-            {/* Drawing Controls */}
+            {/* Base Map Selector and Drawing Controls */}
             <div className="flex items-center gap-2">
+              <BaseMapSelector 
+                selectedBaseMap={selectedBaseMap}
+                onBaseMapChange={handleBaseMapChange}
+              />
               <Button
                 variant={drawingMode ? "default" : "outline"}
                 onClick={drawingMode ? finishDrawing : startDrawing}
