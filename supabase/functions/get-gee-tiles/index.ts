@@ -76,8 +76,22 @@ serve(async (req) => {
           
           if (!apiResponse.ok) {
             console.error('❌ API response failed:', apiResponse.status);
+            
+            // Try to get the error details
+            let errorDetails = '';
+            try {
+              const errorData = await apiResponse.json();
+              errorDetails = errorData.error || errorData.message || '';
+            } catch (e) {
+              errorDetails = apiResponse.statusText;
+            }
+            
             return new Response(
-              JSON.stringify({ error: `API failed: ${apiResponse.status}` }),
+              JSON.stringify({ 
+                error: `API failed: ${apiResponse.status}`,
+                details: errorDetails,
+                suggestion: apiResponse.status === 404 ? "Try a different year, month, or dataset" : "Check API configuration"
+              }),
               { 
                 status: apiResponse.status, 
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -90,9 +104,30 @@ serve(async (req) => {
           if (!apiData.tile_url) {
             console.error('❌ No tile_url in API response:', apiData);
             return new Response(
-              JSON.stringify({ error: 'No tile URL available' }),
+              JSON.stringify({ 
+                error: 'No tile URL available',
+                details: 'The API response did not contain a valid tile URL',
+                suggestion: 'Check if the dataset and parameters are valid'
+              }),
               { 
                 status: 500, 
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+              }
+            );
+          }
+          
+          // Check if the response indicates no data
+          if (apiData.error && apiData.error.includes('No data available')) {
+            console.warn('⚠️ No data available for requested parameters:', apiData);
+            return new Response(
+              JSON.stringify({
+                error: apiData.error,
+                suggestion: apiData.suggestion || 'Try different parameters',
+                dataset: apiData.dataset,
+                requestedParams: apiData.requestedParams
+              }),
+              { 
+                status: 404, 
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
               }
             );
@@ -102,10 +137,22 @@ serve(async (req) => {
           geeUrlCache.set(cacheKey, geeTileUrl);
           console.log('✅ Cached GEE tile URL:', geeTileUrl);
           
+          // Log data info if available
+          if (apiData.dataInfo) {
+            console.log('📊 Data info:', {
+              imageCount: apiData.dataInfo.imageCount,
+              dateRange: apiData.dataInfo.dateRange,
+              hasValidData: apiData.dataInfo.hasValidData
+            });
+          }
+          
         } catch (error) {
           console.error('❌ Error fetching GEE tile URL:', error);
           return new Response(
-            JSON.stringify({ error: `Failed to get GEE tile URL: ${error.message}` }),
+            JSON.stringify({ 
+              error: `Failed to get GEE tile URL: ${error.message}`,
+              suggestion: 'Check network connectivity and API configuration'
+            }),
             { 
               status: 500, 
               headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
