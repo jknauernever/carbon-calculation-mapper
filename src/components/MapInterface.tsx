@@ -565,15 +565,24 @@ export const MapInterface = () => {
   };
 
   const handleDatasetSelect = async (dataset: Dataset) => {
+    console.log('🎯 Dataset selection started:', dataset.name);
+    console.log('📊 Current state:', {
+      mapExists: !!map.current,
+      isMapLoaded,
+      activeDatasets: Object.keys(activeDatasets),
+      mapboxToken: !!mapboxToken
+    });
+    
     setSelectedDataset(dataset);
-    console.log('Selected dataset:', dataset);
     
     // Check if dataset is already active
     if (activeDatasets[dataset.id]) {
+      console.log('⚠️ Dataset already active:', dataset.name);
       toast.info(`${dataset.name} is already active`);
       return;
     }
     
+    console.log('✅ Starting to add dataset layer...');
     toast.success(`Adding dataset: ${dataset.name}`);
     
     // Add new dataset layer to map
