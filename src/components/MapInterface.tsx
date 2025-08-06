@@ -674,18 +674,18 @@ export const MapInterface = () => {
         throw new Error(`API Error: ${error.message || 'Unknown error'}`);
       }
 
-      if (!data?.tileUrl) {
+      if (!data?.tile_url) {
         console.error('❌ No tile URL in response:', data);
         throw new Error('No tile URL received - check GEE configuration');
       }
 
-      console.log('✅ Tile URL received:', data.tileUrl);
+      console.log('✅ Tile URL received:', data.tile_url);
       
       // Add tile source
       console.log('🗺️ Adding tile source:', sourceId);
       map.current.addSource(sourceId, {
         type: 'raster',
-        tiles: [data.tileUrl],
+        tiles: [data.tile_url],
         tileSize: 256,
         minzoom: 0,
         maxzoom: 15,

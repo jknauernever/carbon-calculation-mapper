@@ -123,25 +123,19 @@ export const DatasetTransparencyControls: React.FC<DatasetTransparencyControlsPr
               </div>
             </div>
             
-            {/* Opacity Slider */}
+            {/* Opacity Status - Always Full Opacity */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-medium text-muted-foreground">
-                  Transparency
+                  Opacity
                 </label>
                 <span className="text-xs text-muted-foreground">
-                  {Math.round((1 - activeDataset.opacity) * 100)}%
+                  100%
                 </span>
               </div>
-              <Slider
-                value={[activeDataset.opacity]}
-                onValueChange={(value) => onOpacityChange(datasetId, value[0])}
-                max={1}
-                min={0}
-                step={0.01}
-                className="w-full"
-                disabled={!activeDataset.visible}
-              />
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="bg-green-500 h-2 rounded-full" style={{width: '100%'}}></div>
+              </div>
               <div className="flex justify-between text-xs text-muted-foreground">
                 <span>Transparent</span>
                 <span>Opaque</span>
