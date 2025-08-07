@@ -4,9 +4,8 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, Square, RotateCcw, ChevronLeft, ChevronRight, TrendingUp, MapPin } from "lucide-react";
+import { Search, Square, RotateCcw, TrendingUp, MapPin } from "lucide-react";
 import { toast } from "sonner";
-import { GEELayerToggle } from "./GEELayerToggle";
 
 import { CarbonResults } from "./CarbonResults";
 import { BaseMapSelector } from "./BaseMapSelector";
@@ -46,8 +45,6 @@ export const MapInterface = () => {
   const [carbonCalculation, setCarbonCalculation] = useState<CarbonCalculation | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
   const [mapboxToken, setMapboxToken] = useState<string>('');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [activeLayers, setActiveLayers] = useState<Record<string, { enabled: boolean; opacity: number }>>({});
   const [selectedBaseMap, setSelectedBaseMap] = useState<string>('satellite-streets');
 
   // Initialize map with Mapbox token from Supabase
@@ -149,7 +146,7 @@ export const MapInterface = () => {
     }
   }, []); // Only run once on mount
 
-  // Handle map resize when sidebar toggles or window resizes
+  // Handle map resize when window resizes or selected area changes
   useEffect(() => {
     const handleResize = () => {
       if (map.current) {
@@ -160,14 +157,14 @@ export const MapInterface = () => {
     // Listen for window resize events
     window.addEventListener('resize', handleResize);
     
-    // Resize map when sidebar collapsed state changes or selected area changes
+    // Resize map when selected area changes
     const timeoutId = setTimeout(handleResize, 300); // Allow transition to complete
 
     return () => {
       window.removeEventListener('resize', handleResize);
       clearTimeout(timeoutId);
     };
-  }, [sidebarCollapsed, selectedArea]); // Add selectedArea dependency
+  }, [selectedArea]);
 
   // Handle base map style changes
   useEffect(() => {
@@ -587,52 +584,6 @@ export const MapInterface = () => {
 
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden">
-      {/* Left Sidebar */}
-      <div className={`${sidebarCollapsed ? 'w-12' : 'w-80'} transition-all duration-300 bg-card border-r border-border flex flex-col`}>
-        {/* Sidebar Header */}
-        <div className="p-4 border-b border-border flex flex-col">
-          {!sidebarCollapsed && (
-            <>
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-foreground">
-                  Data Layers
-                </h2>
-              </div>
-            </>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="p-2 self-end"
-          >
-            {sidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-          </Button>
-        </div>
-
-        {/* Sidebar Content */}
-        {!sidebarCollapsed && (
-          <div className="flex-1 overflow-y-auto p-4">
-            <div className="space-y-4">
-              <GEELayerToggle
-                onLayerToggle={(layerId, enabled) => {
-                  setActiveLayers(prev => ({
-                    ...prev,
-                    [layerId]: { ...prev[layerId], enabled }
-                  }));
-                }}
-                onLayerOpacityChange={(layerId, opacity) => {
-                  setActiveLayers(prev => ({
-                    ...prev,
-                    [layerId]: { ...prev[layerId], opacity }
-                  }));
-                }}
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
       {/* Main Map Area */}
       <div className="flex-1 flex flex-col min-w-0 w-full">
         {/* Map Controls Header */}
