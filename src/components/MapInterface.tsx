@@ -44,7 +44,7 @@ export const MapInterface = () => {
   const [mapboxToken, setMapboxToken] = useState<string>('');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeLayers, setActiveLayers] = useState<Record<string, { enabled: boolean; opacity: number }>>({});
-  const [selectedBaseMap, setSelectedBaseMap] = useState<string>('none');
+  const [selectedBaseMap, setSelectedBaseMap] = useState<string>('satellite-streets');
 
   // Initialize map with Mapbox token from Supabase
   useEffect(() => {
@@ -103,17 +103,7 @@ export const MapInterface = () => {
 
       map.current = new mapboxgl.Map({
         container: mapContainer.current,
-        style: 'data:application/json;base64,' + btoa(JSON.stringify({
-          version: 8,
-          sources: {},
-          layers: [{
-            id: 'background',
-            type: 'background',
-            paint: {
-              'background-color': '#ffffff'
-            }
-          }]
-        })),
+        style: getMapStyle('satellite-streets'),
         center: [0, 0],
         zoom: 2,
         projection: 'mercator',
@@ -175,10 +165,12 @@ export const MapInterface = () => {
     };
   }, [sidebarCollapsed]);
 
-  // Handle base map style changes separately - DISABLED
+  // Handle base map style changes
   useEffect(() => {
-    console.log('🎨 Base map style change disabled - keeping white background');
-    // Disabled to show only NDVI tiles
+    if (!map.current || !isMapLoaded) return;
+    
+    const newStyle = getMapStyle(selectedBaseMap);
+    map.current.setStyle(newStyle);
   }, [selectedBaseMap, isMapLoaded]);
 
   const getMapStyle = (baseMapId: string) => {
@@ -204,12 +196,12 @@ export const MapInterface = () => {
       'navigation-night': 'mapbox://styles/mapbox/navigation-night-v1'
     };
     
-    return baseMapOptions[baseMapId] || baseMapOptions['satellite'];
+    return baseMapOptions[baseMapId] || baseMapOptions['satellite-streets'];
   };
 
   const handleBaseMapChange = (baseMapId: string) => {
-    console.log('🎨 Base map change disabled - keeping white background');
-    // Disabled to show only NDVI tiles
+    setSelectedBaseMap(baseMapId);
+    toast.success(`Base map changed to ${baseMapId}`);
   };
 
   // Helper functions first (no dependencies)
