@@ -537,6 +537,7 @@ export const MapInterface = () => {
     
     setSearchAddress(suggestion.place_name);
     setShowSuggestions(false);
+    setSearchSuggestions([]);
     toast.success(`Found: ${suggestion.place_name}`);
   };
 
