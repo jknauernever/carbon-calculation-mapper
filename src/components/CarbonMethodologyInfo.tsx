@@ -142,10 +142,10 @@ export const CarbonMethodologyInfo = () => {
                     Higher NDVI indicates healthier, more productive vegetation with greater carbon storage.
                   </p>
                   <div className="mt-2 text-xs bg-muted p-2 rounded space-y-1">
-                    <div><strong>Dense Forest:</strong> 140-320 t CO₂e/ha (NDVI-dependent)</div>
-                    <div><strong>Grassland:</strong> 60-120 t CO₂e/ha (NDVI-dependent)</div>
-                    <div><strong>Agricultural:</strong> 30-110 t CO₂e/ha (NDVI-dependent)</div>
-                    <div><strong>Sparse Vegetation:</strong> 20-80 t CO₂e/ha (NDVI-dependent)</div>
+                    <div><strong>Dense Forest:</strong> 38-87 t CO₂e/ha (NDVI-dependent)</div>
+                    <div><strong>Grassland:</strong> 16-33 t CO₂e/ha (NDVI-dependent)</div>
+                    <div><strong>Agricultural:</strong> 8-30 t CO₂e/ha (NDVI-dependent)</div>
+                    <div><strong>Sparse Vegetation:</strong> 5-22 t CO₂e/ha (NDVI-dependent)</div>
                   </div>
                 </div>
 
