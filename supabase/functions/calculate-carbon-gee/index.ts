@@ -250,13 +250,12 @@ function calculateCarbonFromRealData(
   totalAbovegroundBiomass *= variabilityFactor;
   totalBelowgroundBiomass *= variabilityFactor;
 
-  // Convert all carbon values to CO₂e (multiply by 3.67)
-  const co2ConversionFactor = 3.67;
+  // Carbon coefficients already represent CO₂e values, no conversion needed
   
   return {
-    total_co2e: parseFloat(((totalAbovegroundBiomass + totalBelowgroundBiomass + totalSoilCarbon) * co2ConversionFactor).toFixed(2)),
-    above_ground_biomass: parseFloat((totalAbovegroundBiomass * co2ConversionFactor).toFixed(2)),
-    below_ground_biomass: parseFloat((totalBelowgroundBiomass * co2ConversionFactor).toFixed(2)),
-    soil_organic_carbon: parseFloat((totalSoilCarbon * co2ConversionFactor).toFixed(2))
+    total_co2e: parseFloat((totalAbovegroundBiomass + totalBelowgroundBiomass + totalSoilCarbon).toFixed(2)),
+    above_ground_biomass: parseFloat(totalAbovegroundBiomass.toFixed(2)),
+    below_ground_biomass: parseFloat(totalBelowgroundBiomass.toFixed(2)),
+    soil_organic_carbon: parseFloat(totalSoilCarbon.toFixed(2))
   };
 }
