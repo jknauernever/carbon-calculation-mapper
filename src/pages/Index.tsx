@@ -16,7 +16,7 @@ const Index = () => {
             estimates including above-ground biomass, below-ground biomass, and soil organic carbon values.
           </p>
         </div>
-        <div className="h-[calc(100vh-180px)] sm:h-[calc(100vh-240px)]">
+        <div className="h-[calc(100vh-220px)] sm:h-[calc(100vh-280px)]">
           <MapInterface />
         </div>
         <div className="text-center py-4 border-t border-border mt-4">
