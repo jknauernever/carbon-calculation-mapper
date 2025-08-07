@@ -489,19 +489,31 @@ export const MapInterface = () => {
   const handleAddressSearch = async () => {
     if (!searchAddress.trim()) return;
 
-    // Mock geocoding - center on a default location
-    // In real implementation, use Mapbox Geocoding API
-    const mockCoords: [number, number] = [-98.5795, 39.8283];
-    
-    if (map.current) {
-      map.current.flyTo({
-        center: mockCoords,
-        zoom: 10,
-        duration: 2000
-      });
+    try {
+      const geocodingUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchAddress)}.json?access_token=${mapboxToken}&autocomplete=true&limit=1`;
+      
+      const response = await fetch(geocodingUrl);
+      const data = await response.json();
+      
+      if (data.features && data.features.length > 0) {
+        const [lng, lat] = data.features[0].center;
+        
+        if (map.current) {
+          map.current.flyTo({
+            center: [lng, lat],
+            zoom: 14,
+            duration: 2000
+          });
+        }
+        
+        toast.success(`Found: ${data.features[0].place_name}`);
+      } else {
+        toast.error('Location not found');
+      }
+    } catch (error) {
+      console.error('Geocoding error:', error);
+      toast.error('Search failed. Please try again.');
     }
-    
-    toast.success(`Searching for: ${searchAddress}`);
   };
 
 
