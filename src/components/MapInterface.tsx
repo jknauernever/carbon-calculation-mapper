@@ -583,14 +583,14 @@ export const MapInterface = () => {
 
 
   return (
-    <div className="flex h-screen w-full bg-background overflow-hidden">
+    <div className="flex flex-col lg:flex-row h-screen w-full bg-background overflow-hidden">
       {/* Main Map Area */}
-      <div className="flex-1 flex flex-col min-w-0 w-full">
+      <div className="flex-1 flex flex-col min-w-0 w-full order-2 lg:order-1">
         {/* Map Controls Header */}
-        <div className="bg-card border-b border-border p-4">
-          <div className="flex items-center gap-4">
+        <div className="bg-card border-b border-border p-2 sm:p-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4">
             {/* Search */}
-            <div className="flex-1 flex items-center gap-2 relative">
+            <div className="flex-1 w-full sm:flex-1 flex items-center gap-2 relative">
               <Search className="w-4 h-4 text-muted-foreground" />
               <div className="flex-1 relative">
                 <Input
@@ -633,7 +633,7 @@ export const MapInterface = () => {
             </div>
 
             {/* Base Map Selector and Drawing Controls */}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-center sm:justify-start">
               <BaseMapSelector 
                 selectedBaseMap={selectedBaseMap}
                 onBaseMapChange={handleBaseMapChange}
@@ -701,7 +701,7 @@ export const MapInterface = () => {
 
       {/* Right Sidebar - Selected Area Results */}
       {selectedArea && (
-        <div className="w-80 bg-card border-l border-border flex flex-col transition-all duration-300">
+        <div className="w-full lg:w-80 bg-card border-t lg:border-t-0 lg:border-l border-border flex flex-col transition-all duration-300 order-1 lg:order-2 max-h-64 lg:max-h-none">
           <div className="p-4 border-b border-border">
             <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
               <TrendingUp className="h-5 w-5" />
