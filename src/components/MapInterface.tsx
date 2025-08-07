@@ -7,12 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Search, Square, RotateCcw, ChevronLeft, ChevronRight, TrendingUp, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { GEELayerToggle } from "./GEELayerToggle";
-import { DatasetSelector } from "./DatasetSelector";
+
 import { CarbonResults } from "./CarbonResults";
 import { BaseMapSelector } from "./BaseMapSelector";
 import { GEEDataVisualization } from "./GEEDataVisualization";
 import { CarbonMethodologyInfo } from "./CarbonMethodologyInfo";
-import { DatasetTransparencyControls } from "./DatasetTransparencyControls";
+
 
 
 import { supabase } from "@/integrations/supabase/client";
@@ -26,13 +26,6 @@ interface CarbonCalculation {
   data_sources?: any;
 }
 
-interface Dataset {
-  id: string;
-  name: string;
-  description: string;
-  category: string;
-  parameters?: Record<string, any>;
-}
 
 export const MapInterface = () => {
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -51,10 +44,6 @@ export const MapInterface = () => {
   const [mapboxToken, setMapboxToken] = useState<string>('');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeLayers, setActiveLayers] = useState<Record<string, { enabled: boolean; opacity: number }>>({});
-  const [activeDatasets, setActiveDatasets] = useState<Record<string, { dataset: Dataset; opacity: number; visible: boolean }>>({});
-  const [selectedDataset, setSelectedDataset] = useState<Dataset | null>(null);
-  const [datasetMetadata, setDatasetMetadata] = useState<any>(null);
-  const [tileLoading, setTileLoading] = useState(false);
   const [selectedBaseMap, setSelectedBaseMap] = useState<string>('none');
 
   // Initialize map with Mapbox token from Supabase
@@ -501,13 +490,6 @@ export const MapInterface = () => {
     clearDrawing();
     setIsDrawing(false);
     
-    // Clear dataset layers
-    clearDatasetLayers();
-    setSelectedDataset(null);
-    setDatasetMetadata(null);
-    setActiveLayers({});
-    setActiveDatasets({});
-    
     toast.info('Map cleared');
   };
 
@@ -530,308 +512,6 @@ export const MapInterface = () => {
     toast.success(`Searching for: ${searchAddress}`);
   };
 
-  const handleDatasetSelect = async (dataset: Dataset) => {
-    console.group('🎯 DATASET SELECTION DEBUG');
-    console.log('📊 Current state:', {
-      mapExists: !!map.current,
-      isMapLoaded,
-      activeDatasets: Object.keys(activeDatasets),
-      mapboxToken: !!mapboxToken
-    });
-    
-    setSelectedDataset(dataset);
-    
-    // Check if dataset is already active - if so, remove it first
-    if (activeDatasets[dataset.id]) {
-      console.log('🔄 Dataset already active, removing first:', dataset.name);
-      handleRemoveDataset(dataset.id);
-      // Wait a moment for cleanup
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-    
-    console.log('✅ About to call addDatasetLayer...');
-    toast.success(`Adding dataset: ${dataset.name}`);
-    
-    try {
-      // Add new dataset layer to map
-      await addDatasetLayer(dataset, dataset.id, 1.0);
-      console.log('✅ addDatasetLayer completed successfully');
-    } catch (error) {
-      console.error('❌ addDatasetLayer failed:', error);
-      alert('❌ Layer addition failed: ' + error.message);
-    }
-    
-    console.groupEnd();
-  };
-
-  const clearDatasetLayers = () => {
-    if (!map.current) return;
-    
-    // Remove all dataset layers
-    Object.keys(activeDatasets).forEach(datasetId => {
-      const layerId = `dataset-layer-${datasetId}`;
-      const sourceId = `dataset-tiles-${datasetId}`;
-      
-      if (map.current?.getLayer(layerId)) {
-        map.current.removeLayer(layerId);
-      }
-      if (map.current?.getSource(sourceId)) {
-        map.current.removeSource(sourceId);
-      }
-    });
-  };
-
-  const addDatasetLayer = async (dataset: Dataset, datasetId: string = dataset.id, opacity: number = 1.0) => {
-    console.log('🔄 Adding dataset layer:', dataset.name);
-    
-    if (!map.current) {
-      console.error('❌ Map not initialized');
-      toast.error('Map not ready');
-      return;
-    }
-
-    if (!isMapLoaded) {
-      console.error('❌ Map not loaded yet');
-      toast.error('Please wait for map to load');
-      return;
-    }
-
-    setTileLoading(true);
-    
-    try {
-      const layerId = `dataset-layer-${datasetId}`;
-      const sourceId = `dataset-tiles-${datasetId}`;
-      
-      // Clean up existing layer and source
-      try {
-        if (map.current.getLayer(layerId)) {
-          console.log('🧹 Removing existing layer:', layerId);
-          map.current.removeLayer(layerId);
-        }
-      } catch (layerError) {
-        console.warn('⚠️ Layer cleanup warning:', layerError);
-      }
-      
-      try {
-        if (map.current.getSource(sourceId)) {
-          console.log('🧹 Removing existing source:', sourceId);
-          map.current.removeSource(sourceId);
-        }
-      } catch (sourceError) {
-        console.warn('⚠️ Source cleanup warning:', sourceError);
-      }
-      
-      // Get tile URL from edge function
-      console.log('🌐 Requesting tile URL from edge function');
-      const { data, error } = await supabase.functions.invoke('get-gee-tiles', {
-        body: {
-          dataset: dataset.id,
-          year: '2024',
-          month: '6'
-        }
-      });
-
-      if (error) {
-        console.error('❌ Edge function error:', error);
-        throw new Error(`API Error: ${error.message || 'Unknown error'}`);
-      }
-
-      if (!data?.tileUrl) {
-        console.error('❌ No tile URL in response:', data);
-        throw new Error('No tile URL received - check GEE configuration');
-      }
-
-      console.log('✅ Tile URL received:', data.tileUrl);
-      
-      // Add tile source
-      console.log('🗺️ Adding tile source:', sourceId);
-      map.current.addSource(sourceId, {
-        type: 'raster',
-        tiles: [data.tileUrl],
-        tileSize: 256,
-        minzoom: 0,
-        maxzoom: 15,
-        attribution: 'Google Earth Engine'
-      });
-      
-      // Find insertion point (before labels)
-      let beforeId: string | undefined;
-      try {
-        const style = map.current.getStyle();
-        if (style?.layers) {
-          for (const layer of style.layers) {
-            if (layer.id.includes('label') || layer.id.includes('text') || layer.id.includes('symbol')) {
-              beforeId = layer.id;
-              break;
-            }
-          }
-        }
-      } catch (styleError) {
-        console.warn('⚠️ Could not determine layer order:', styleError);
-      }
-      
-      console.log('🎨 Adding raster layer:', layerId, beforeId ? `before ${beforeId}` : 'at top');
-      
-      // Add raster layer
-      map.current.addLayer({
-        id: layerId,
-        type: 'raster',
-        source: sourceId,
-        paint: {
-          'raster-opacity': 1.0, // Always full opacity
-          'raster-fade-duration': 300
-        }
-      }, beforeId);
-      
-      // Debug: Check if layer was added successfully
-      setTimeout(() => {
-        if (map.current?.getLayer(layerId)) {
-          console.log('✅ Layer confirmed visible:', layerId);
-          console.log('🎨 Layer paint properties:', map.current.getPaintProperty(layerId, 'raster-opacity'));
-          console.log('👁️ Layer visibility:', map.current.getLayoutProperty(layerId, 'visibility'));
-          console.log('🗺️ Layer source:', map.current.getLayer(layerId).source);
-        } else {
-          console.error('❌ Layer not found after adding:', layerId);
-        }
-      }, 1000);
-      
-      // Update state with full opacity
-      setActiveDatasets(prev => ({
-        ...prev,
-        [datasetId]: {
-          dataset,
-          opacity: 1.0, // Always full opacity
-          visible: true
-        }
-      }));
-      
-      // Set metadata
-      setDatasetMetadata({
-        collection: dataset.parameters?.collection || 'Unknown',
-        band: dataset.parameters?.band || 'Unknown',
-        description: dataset.description,
-        category: dataset.category,
-        temporalResolution: dataset.parameters?.temporalResolution || 'Unknown',
-        spatialResolution: dataset.parameters?.spatialResolution || 'Unknown'
-      });
-      
-      console.log('✅ Layer added successfully:', {
-        layerId,
-        sourceId,
-        dataset: dataset.name,
-        opacity
-      });
-      
-      // Zoom to data area for NDVI
-      if (dataset.id === 'ndvi') {
-        console.log('🎯 Zooming to NDVI data area');
-        map.current.flyTo({
-          center: [-95.0, 39.0], // Central US
-          zoom: 8,
-          duration: 2000
-        });
-        toast.success(`${dataset.name} layer added - Zooming to data area`);
-      } else {
-        toast.success(`${dataset.name} layer added successfully`);
-      }
-      
-      // Add source monitoring
-      const handleSourceData = (e: any) => {
-        if (e.sourceId === sourceId && e.isSourceLoaded) {
-          console.log('✅ Tiles loaded for:', dataset.name);
-          map.current?.off('sourcedata', handleSourceData);
-        }
-      };
-      
-      const handleTileError = (e: any) => {
-        console.error('❌ Tile load error:', e);
-        if (e.sourceId === sourceId) {
-          toast.error(`Failed to load ${dataset.name} tiles`);
-        }
-      };
-      
-      map.current.on('sourcedata', handleSourceData);
-      map.current.on('error', handleTileError);
-      
-    } catch (error) {
-      console.error('❌ Failed to add dataset layer:', error);
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      toast.error(`Failed to load ${dataset.name}: ${errorMsg}`);
-    } finally {
-      setTileLoading(false);
-    }
-  };
-
-  // Transparency control functions
-  const handleOpacityChange = (datasetId: string, opacity: number) => {
-    const layerId = `dataset-layer-${datasetId}`;
-    
-    if (map.current?.getLayer(layerId)) {
-      map.current.setPaintProperty(layerId, 'raster-opacity', opacity);
-      
-      setActiveDatasets(prev => ({
-        ...prev,
-        [datasetId]: {
-          ...prev[datasetId],
-          opacity
-        }
-      }));
-    }
-  };
-
-  const handleVisibilityToggle = (datasetId: string) => {
-    const layerId = `dataset-layer-${datasetId}`;
-    const activeDataset = activeDatasets[datasetId];
-    
-    if (map.current?.getLayer(layerId)) {
-      const newVisibility = !activeDataset.visible;
-      map.current.setLayoutProperty(layerId, 'visibility', newVisibility ? 'visible' : 'none');
-      
-      setActiveDatasets(prev => ({
-        ...prev,
-        [datasetId]: {
-          ...prev[datasetId],
-          visible: newVisibility
-        }
-      }));
-      
-      toast.success(`${activeDataset.dataset.name} ${newVisibility ? 'shown' : 'hidden'}`);
-    }
-  };
-
-  const handleRemoveDataset = (datasetId: string) => {
-    const layerId = `dataset-layer-${datasetId}`;
-    const sourceId = `dataset-tiles-${datasetId}`;
-    const activeDataset = activeDatasets[datasetId];
-    
-    if (map.current?.getLayer(layerId)) {
-      map.current.removeLayer(layerId);
-    }
-    if (map.current?.getSource(sourceId)) {
-      map.current.removeSource(sourceId);
-    }
-    
-    setActiveDatasets(prev => {
-      const newDatasets = { ...prev };
-      delete newDatasets[datasetId];
-      return newDatasets;
-    });
-    
-    toast.success(`${activeDataset.dataset.name} layer removed`);
-  };
-
-  const getColorPalette = (category: string) => {
-    const palettes: Record<string, string[]> = {
-      'Vegetation': ['#8B4513', '#DAA520', '#9ACD32', '#32CD32', '#006400'],
-      'Water': ['#E6F3FF', '#CCE7FF', '#99D6FF', '#4169E1', '#000080'],
-      'Climate': ['#4169E1', '#1E90FF', '#FFD700', '#FF8C00', '#DC143C'],
-      'Temperature': ['#000080', '#4169E1', '#FFD700', '#FF8C00', '#DC143C'],
-      'Precipitation': ['#F5F5DC', '#87CEEB', '#4169E1', '#0000CD', '#000080'],
-      'Landcover': ['#8B4513', '#DAA520', '#9ACD32', '#32CD32', '#4169E1'],
-      'Other': ['#696969', '#808080', '#A9A9A9', '#C0C0C0', '#D3D3D3']
-    };
-    return palettes[category] || palettes['Other'];
-  };
 
 
 
@@ -866,92 +546,6 @@ export const MapInterface = () => {
         {!sidebarCollapsed && (
           <div className="flex-1 overflow-y-auto p-4">
               <div className="space-y-4">
-                <DatasetSelector 
-                  onDatasetSelect={handleDatasetSelect}
-                  selectedDataset={selectedDataset}
-                />
-                
-                {/* Dataset Transparency Controls */}
-                <DatasetTransparencyControls
-                  activeDatasets={activeDatasets}
-                  onOpacityChange={handleOpacityChange}
-                  onVisibilityToggle={handleVisibilityToggle}
-                  onRemoveDataset={handleRemoveDataset}
-                />
-                
-                {tileLoading && (
-                  <div className="flex items-center justify-center p-4 bg-muted/50 rounded-lg">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mr-2"></div>
-                    <span>Loading dataset tiles...</span>
-                  </div>
-                )}
-                
-                {selectedDataset && Object.keys(activeDatasets).length === 0 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-sm">
-                        <MapPin className="h-4 w-4" />
-                        Dataset Info
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div>
-                        <h4 className="font-medium text-sm">{selectedDataset.name}</h4>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {selectedDataset.description}
-                        </p>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium">Category:</span>
-                        <span className="text-xs px-2 py-1 bg-secondary rounded">
-                          {selectedDataset.category}
-                        </span>
-                      </div>
-                      
-                      {datasetMetadata && (
-                        <div className="space-y-2">
-                          <h5 className="font-medium text-xs">Metadata</h5>
-                          <div className="text-xs space-y-1">
-                            {datasetMetadata.dateRange && (
-                              <div>
-                                <span className="font-medium">Date Range: </span>
-                                {datasetMetadata.dateRange}
-                              </div>
-                            )}
-                            {datasetMetadata.resolution && (
-                              <div>
-                                <span className="font-medium">Resolution: </span>
-                                {datasetMetadata.resolution}
-                              </div>
-                            )}
-                            {datasetMetadata.units && (
-                              <div>
-                                <span className="font-medium">Units: </span>
-                                {datasetMetadata.units}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                      
-                      <div className="space-y-2">
-                        <h5 className="font-medium text-xs">Color Palette</h5>
-                        <div className="flex gap-1">
-                          {getColorPalette(selectedDataset.category).map((color, index) => (
-                            <div
-                              key={index}
-                              className="w-4 h-4 rounded"
-                              style={{ backgroundColor: color }}
-                              title={color}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
                 {/* Selected Area Results - Moved from right panel */}
                 {selectedArea && (
                   <Card>
