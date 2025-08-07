@@ -530,7 +530,7 @@ export const MapInterface = () => {
     if (map.current) {
       map.current.flyTo({
         center: [lng, lat],
-        zoom: 14,
+        zoom: 18,
         duration: 2000
       });
     }
