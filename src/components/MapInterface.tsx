@@ -36,6 +36,7 @@ export const MapInterface = () => {
   const [searchSuggestions, setSearchSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [justSelected, setJustSelected] = useState(false);
   const [drawingCoords, setDrawingCoords] = useState<Array<[number, number]>>([]);
   const [selectedArea, setSelectedArea] = useState<{
     coordinates: Array<[number, number]>;
@@ -491,6 +492,11 @@ export const MapInterface = () => {
 
   // Debounced search for autocomplete
   useEffect(() => {
+    if (justSelected) {
+      setJustSelected(false);
+      return;
+    }
+    
     const timeoutId = setTimeout(() => {
       if (searchAddress.trim() && searchAddress.length > 2) {
         fetchSuggestions(searchAddress);
@@ -501,7 +507,7 @@ export const MapInterface = () => {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [searchAddress]);
+  }, [searchAddress, justSelected]);
 
   const fetchSuggestions = async (query: string) => {
     if (!mapboxToken) return;
@@ -535,6 +541,7 @@ export const MapInterface = () => {
       });
     }
     
+    setJustSelected(true);
     setSearchAddress(suggestion.place_name);
     setShowSuggestions(false);
     setSearchSuggestions([]);
