@@ -30,13 +30,13 @@ interface CarbonCalculation {
 export const MapInterface = () => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
+  const justSelectedRef = useRef(false);
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [searchAddress, setSearchAddress] = useState('');
   const [isDrawing, setIsDrawing] = useState(false);
   const [searchSuggestions, setSearchSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
-  const [justSelected, setJustSelected] = useState(false);
   const [drawingCoords, setDrawingCoords] = useState<Array<[number, number]>>([]);
   const [selectedArea, setSelectedArea] = useState<{
     coordinates: Array<[number, number]>;
@@ -492,8 +492,8 @@ export const MapInterface = () => {
 
   // Debounced search for autocomplete
   useEffect(() => {
-    if (justSelected) {
-      setJustSelected(false);
+    if (justSelectedRef.current) {
+      justSelectedRef.current = false;
       return;
     }
     
@@ -507,7 +507,7 @@ export const MapInterface = () => {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [searchAddress, justSelected]);
+  }, [searchAddress]);
 
   const fetchSuggestions = async (query: string) => {
     if (!mapboxToken) return;
@@ -541,10 +541,15 @@ export const MapInterface = () => {
       });
     }
     
-    setJustSelected(true);
-    setSearchAddress(suggestion.place_name);
+    // Set flag to prevent search re-triggering
+    justSelectedRef.current = true;
+    
+    // Clear suggestions first to prevent re-triggering
     setShowSuggestions(false);
     setSearchSuggestions([]);
+    
+    // Set the address after clearing suggestions
+    setSearchAddress(suggestion.place_name);
     toast.success(`Found: ${suggestion.place_name}`);
   };
 
@@ -694,7 +699,10 @@ export const MapInterface = () => {
                   onChange={(e) => setSearchAddress(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleAddressSearch()}
                   onFocus={() => searchSuggestions.length > 0 && setShowSuggestions(true)}
-                  onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                  onBlur={() => {
+                    // Don't hide suggestions if user is clicking on them
+                    setTimeout(() => setShowSuggestions(false), 150);
+                  }}
                   className="flex-1"
                 />
                 {showSuggestions && searchSuggestions.length > 0 && (
