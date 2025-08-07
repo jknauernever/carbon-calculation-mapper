@@ -583,7 +583,7 @@ export const MapInterface = () => {
 
 
   return (
-    <div className="flex flex-col lg:flex-row h-screen w-full bg-background overflow-hidden">
+    <div className="flex flex-col lg:flex-row h-full w-full bg-background overflow-hidden">
       {/* Main Map Area */}
       <div className="flex-1 flex flex-col min-w-0 w-full order-2 lg:order-1">
         {/* Map Controls Header */}
