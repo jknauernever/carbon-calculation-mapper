@@ -16,8 +16,13 @@ const Index = () => {
             estimates including above-ground biomass, below-ground biomass, and soil organic carbon values.
           </p>
         </div>
-        <div className="h-[calc(100vh-140px)] sm:h-[calc(100vh-200px)]">
+        <div className="h-[calc(100vh-180px)] sm:h-[calc(100vh-240px)]">
           <MapInterface />
+        </div>
+        <div className="text-center py-4 border-t border-border mt-4">
+          <p className="text-xs text-muted-foreground">
+            Copyright 2025 - All Rights Reserved - <a href="https://KnauerNever.com" target="_blank" rel="noopener noreferrer" className="hover:underline">KnauerNever.com</a>
+          </p>
         </div>
       </div>
     </div>
