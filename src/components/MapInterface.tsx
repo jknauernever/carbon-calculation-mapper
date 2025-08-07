@@ -648,26 +648,14 @@ export const MapInterface = () => {
                   Draw Area
                 </Button>
               ) : (
-                <div className="flex gap-2">
-                  <Button
-                    variant="default"
-                    onClick={finishDrawing}
-                    disabled={drawingCoords.length < 3}
-                    className="flex items-center gap-2"
-                  >
-                    Finish ({drawingCoords.length} points)
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setIsDrawing(false);
-                      clearDrawing();
-                      toast.info('Drawing cancelled');
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                </div>
+                <Button
+                  variant="default"
+                  onClick={finishDrawing}
+                  disabled={drawingCoords.length < 3}
+                  className="flex items-center gap-2"
+                >
+                  Finish ({drawingCoords.length} points)
+                </Button>
               )}
               <Button variant="outline" onClick={clearMap} size="sm">
                 <RotateCcw className="w-4 h-4 mr-2" />
