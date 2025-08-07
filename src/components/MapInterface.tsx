@@ -160,14 +160,14 @@ export const MapInterface = () => {
     // Listen for window resize events
     window.addEventListener('resize', handleResize);
     
-    // Resize map when sidebar collapsed state changes
+    // Resize map when sidebar collapsed state changes or selected area changes
     const timeoutId = setTimeout(handleResize, 300); // Allow transition to complete
 
     return () => {
       window.removeEventListener('resize', handleResize);
       clearTimeout(timeoutId);
     };
-  }, [sidebarCollapsed]);
+  }, [sidebarCollapsed, selectedArea]); // Add selectedArea dependency
 
   // Handle base map style changes
   useEffect(() => {
@@ -613,73 +613,27 @@ export const MapInterface = () => {
         {/* Sidebar Content */}
         {!sidebarCollapsed && (
           <div className="flex-1 overflow-y-auto p-4">
-              <div className="space-y-4">
-                {/* Selected Area Results - Moved from right panel */}
-                {selectedArea && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-sm">
-                        <TrendingUp className="h-4 w-4" />
-                        Selected Area
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="space-y-2">
-                        <p className="text-sm text-muted-foreground">Area</p>
-                        <div className="space-y-1">
-                          <p className="text-lg font-semibold">{selectedArea.areaHectares.toFixed(2)} hectares</p>
-                          <p className="text-sm text-muted-foreground">{selectedArea.areaAcres.toFixed(2)} acres</p>
-                        </div>
-                        <p className="text-xs text-muted-foreground">Points: {selectedArea.coordinates.length}</p>
-                      </div>
-
-                      {isCalculating ? (
-                        <div className="text-center py-4">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                          <p className="mt-2 text-sm text-muted-foreground">Calculating carbon storage...</p>
-                        </div>
-                      ) : carbonCalculation ? (
-                        <div className="space-y-4">
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                              <h3 className="text-sm font-semibold">Carbon Storage Results</h3>
-                              <CarbonMethodologyInfo />
-                            </div>
-                            <div className="grid grid-cols-1 gap-3 text-sm">
-                              <div className="bg-muted/50 p-2 rounded">
-                                <span className="text-muted-foreground">Total CO₂e:</span>
-                                <span className="font-semibold ml-2">{carbonCalculation.total_co2e.toFixed(1)} t CO₂e</span>
-                              </div>
-                              <div className="bg-muted/50 p-2 rounded">
-                                <span className="text-muted-foreground">Above-Ground Biomass:</span>
-                                <span className="font-semibold ml-2">{carbonCalculation.above_ground_biomass.toFixed(1)} t CO₂e</span>
-                              </div>
-                              <div className="bg-muted/50 p-2 rounded">
-                                <span className="text-muted-foreground">Below-Ground Biomass:</span>
-                                <span className="font-semibold ml-2">{carbonCalculation.below_ground_biomass.toFixed(1)} t CO₂e</span>
-                              </div>
-                              <div className="bg-muted/50 p-2 rounded">
-                                <span className="text-muted-foreground">Soil Carbon:</span>
-                                <span className="font-semibold ml-2">{carbonCalculation.soil_organic_carbon.toFixed(1)} t CO₂e</span>
-                              </div>
-                              <div className="bg-muted/50 p-2 rounded">
-                                <span className="text-muted-foreground">Method:</span>
-                                <span className="font-semibold ml-2 text-xs">{carbonCalculation.calculation_method}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="text-center py-2">
-                          <p className="text-sm text-muted-foreground">
-                            {isDrawing ? 'Add more points, then click Finish' : 'Click "Draw Area" to start'}
-                          </p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
+            <div className="space-y-4">
+              <GEELayerToggle
+                onLayerToggle={(layerId, enabled) => {
+                  setActiveLayers(prev => ({
+                    ...prev,
+                    [layerId]: { ...prev[layerId], enabled }
+                  }));
+                }}
+                onLayerOpacityChange={(layerId, opacity) => {
+                  setActiveLayers(prev => ({
+                    ...prev,
+                    [layerId]: { ...prev[layerId], opacity }
+                  }));
+                }}
+              />
+              {carbonCalculation && (
+                <GEEDataVisualization 
+                  carbonCalculation={carbonCalculation} 
+                />
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -810,6 +764,84 @@ export const MapInterface = () => {
           )}
         </div>
       </div>
+
+      {/* Right Sidebar - Selected Area Results */}
+      {selectedArea && (
+        <div className="w-80 bg-card border-l border-border flex flex-col transition-all duration-300">
+          <div className="p-4 border-b border-border">
+            <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Selected Area
+            </h2>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-4">
+            <div className="space-y-4">
+              <Card>
+                <CardContent className="p-4 space-y-4">
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground">Area</p>
+                    <div className="space-y-1">
+                      <p className="text-lg font-semibold">{selectedArea.areaHectares.toFixed(2)} hectares</p>
+                      <p className="text-sm text-muted-foreground">{selectedArea.areaAcres.toFixed(2)} acres</p>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Points: {selectedArea.coordinates.length}</p>
+                  </div>
+
+                  {isCalculating ? (
+                    <div className="text-center py-4">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                      <p className="mt-2 text-sm text-muted-foreground">Calculating carbon storage...</p>
+                    </div>
+                  ) : carbonCalculation ? (
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm font-semibold">Carbon Storage Results</h3>
+                          <CarbonMethodologyInfo />
+                        </div>
+                        <div className="grid grid-cols-1 gap-3 text-sm">
+                          <div className="bg-muted/50 p-2 rounded">
+                            <span className="text-muted-foreground">Total CO₂e:</span>
+                            <span className="font-semibold ml-2">{carbonCalculation.total_co2e.toFixed(1)} t CO₂e</span>
+                          </div>
+                          <div className="bg-muted/50 p-2 rounded">
+                            <span className="text-muted-foreground">Above-Ground Biomass:</span>
+                            <span className="font-semibold ml-2">{carbonCalculation.above_ground_biomass.toFixed(1)} t CO₂e</span>
+                          </div>
+                          <div className="bg-muted/50 p-2 rounded">
+                            <span className="text-muted-foreground">Below-Ground Biomass:</span>
+                            <span className="font-semibold ml-2">{carbonCalculation.below_ground_biomass.toFixed(1)} t CO₂e</span>
+                          </div>
+                          <div className="bg-muted/50 p-2 rounded">
+                            <span className="text-muted-foreground">Soil Carbon:</span>
+                            <span className="font-semibold ml-2">{carbonCalculation.soil_organic_carbon.toFixed(1)} t CO₂e</span>
+                          </div>
+                          <div className="bg-muted/50 p-2 rounded">
+                            <span className="text-muted-foreground">Method:</span>
+                            <span className="font-semibold ml-2 text-xs">{carbonCalculation.calculation_method}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-2">
+                      <p className="text-sm text-muted-foreground">
+                        {isDrawing ? 'Add more points, then click Finish' : 'Click "Draw Area" to start'}
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+              
+              {/* Enhanced Data Visualization for right sidebar */}
+              {carbonCalculation && (
+                <GEEDataVisualization carbonCalculation={carbonCalculation} />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
