@@ -33,6 +33,9 @@ export const MapInterface = () => {
   const [isMapLoaded, setIsMapLoaded] = useState(false);
   const [searchAddress, setSearchAddress] = useState('');
   const [isDrawing, setIsDrawing] = useState(false);
+  const [searchSuggestions, setSearchSuggestions] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
   const [drawingCoords, setDrawingCoords] = useState<Array<[number, number]>>([]);
   const [selectedArea, setSelectedArea] = useState<{
     coordinates: Array<[number, number]>;
@@ -486,8 +489,66 @@ export const MapInterface = () => {
   };
 
 
+  // Debounced search for autocomplete
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchAddress.trim() && searchAddress.length > 2) {
+        fetchSuggestions(searchAddress);
+      } else {
+        setSearchSuggestions([]);
+        setShowSuggestions(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchAddress]);
+
+  const fetchSuggestions = async (query: string) => {
+    if (!mapboxToken) return;
+    
+    setIsSearching(true);
+    try {
+      const geocodingUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${mapboxToken}&autocomplete=true&limit=5`;
+      
+      const response = await fetch(geocodingUrl);
+      const data = await response.json();
+      
+      if (data.features) {
+        setSearchSuggestions(data.features);
+        setShowSuggestions(true);
+      }
+    } catch (error) {
+      console.error('Geocoding error:', error);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleSuggestionSelect = (suggestion: any) => {
+    const [lng, lat] = suggestion.center;
+    
+    if (map.current) {
+      map.current.flyTo({
+        center: [lng, lat],
+        zoom: 14,
+        duration: 2000
+      });
+    }
+    
+    setSearchAddress(suggestion.place_name);
+    setShowSuggestions(false);
+    toast.success(`Found: ${suggestion.place_name}`);
+  };
+
   const handleAddressSearch = async () => {
     if (!searchAddress.trim()) return;
+    
+    setShowSuggestions(false);
+    
+    if (searchSuggestions.length > 0) {
+      handleSuggestionSelect(searchSuggestions[0]);
+      return;
+    }
 
     try {
       const geocodingUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchAddress)}.json?access_token=${mapboxToken}&autocomplete=true&limit=1`;
@@ -496,17 +557,7 @@ export const MapInterface = () => {
       const data = await response.json();
       
       if (data.features && data.features.length > 0) {
-        const [lng, lat] = data.features[0].center;
-        
-        if (map.current) {
-          map.current.flyTo({
-            center: [lng, lat],
-            zoom: 14,
-            duration: 2000
-          });
-        }
-        
-        toast.success(`Found: ${data.features[0].place_name}`);
+        handleSuggestionSelect(data.features[0]);
       } else {
         toast.error('Location not found');
       }
@@ -626,15 +677,40 @@ export const MapInterface = () => {
         <div className="bg-card border-b border-border p-4">
           <div className="flex items-center gap-4">
             {/* Search */}
-            <div className="flex-1 flex items-center gap-2">
+            <div className="flex-1 flex items-center gap-2 relative">
               <Search className="w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Search for an address or location..."
-                value={searchAddress}
-                onChange={(e) => setSearchAddress(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleAddressSearch()}
-                className="flex-1"
-              />
+              <div className="flex-1 relative">
+                <Input
+                  placeholder="Search for an address or location..."
+                  value={searchAddress}
+                  onChange={(e) => setSearchAddress(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleAddressSearch()}
+                  onFocus={() => searchSuggestions.length > 0 && setShowSuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                  className="flex-1"
+                />
+                {showSuggestions && searchSuggestions.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 z-50 bg-card border border-border rounded-md shadow-lg mt-1 max-h-60 overflow-y-auto">
+                    {searchSuggestions.map((suggestion, index) => (
+                      <button
+                        key={index}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-muted/50 first:rounded-t-md last:rounded-b-md border-b border-border last:border-b-0"
+                        onClick={() => handleSuggestionSelect(suggestion)}
+                      >
+                        <div className="flex items-center gap-2">
+                          <MapPin className="w-3 h-3 text-muted-foreground" />
+                          <span className="truncate">{suggestion.place_name}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {isSearching && (
+                  <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                  </div>
+                )}
+              </div>
               <Button onClick={handleAddressSearch} size="sm">
                 Search
               </Button>
