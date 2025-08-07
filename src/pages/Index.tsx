@@ -8,7 +8,7 @@ const Index = () => {
           <h1 className="text-4xl font-bold text-foreground mb-4">
             Land-Based Carbon Calculator
           </h1>
-          <p className="text-lg text-muted-foreground max-w-3xl mx-auto leading-relaxed">
+          <p className="text-lg text-muted-foreground max-w-5xl mx-auto leading-relaxed">
             Estimate carbon storage potential for land areas using satellite imagery and AI-powered analysis. 
             To get started: <span className="font-semibold">zoom into an area on the map</span>, click 
             <span className="font-semibold"> "Draw Area"</span> to draw a polygon around the area you want to measure, then 
