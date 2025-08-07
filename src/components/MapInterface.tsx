@@ -628,11 +628,6 @@ export const MapInterface = () => {
                   }));
                 }}
               />
-              {carbonCalculation && (
-                <GEEDataVisualization 
-                  carbonCalculation={carbonCalculation} 
-                />
-              )}
             </div>
           </div>
         )}
