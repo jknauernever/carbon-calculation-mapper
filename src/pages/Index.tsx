@@ -10,8 +10,9 @@ const Index = () => {
           </h1>
           <p className="text-lg text-muted-foreground max-w-3xl mx-auto leading-relaxed">
             Estimate carbon storage potential for land areas using satellite imagery and AI-powered analysis. 
-            To get started: <span className="font-semibold">draw or select an area on the map</span>, then 
-            <span className="font-semibold"> click "Calculate Carbon"</span> to receive detailed carbon sequestration 
+            To get started: <span className="font-semibold">zoom into an area on the map</span>, click 
+            <span className="font-semibold"> "Draw Area"</span> to draw a polygon around the area you want to measure, then 
+            click <span className="font-semibold">"Finish"</span> to receive detailed carbon storage 
             estimates including above-ground biomass, below-ground biomass, and soil organic carbon values.
           </p>
         </div>
