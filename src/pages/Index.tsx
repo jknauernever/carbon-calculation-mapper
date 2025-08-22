@@ -6,7 +6,7 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       <div className="container mx-auto p-2 sm:p-4">
         <div className="mb-4 sm:mb-8 px-2">
-          <div className="text-center mb-4">
+          <div className="mb-4">
             <h1 className="text-2xl sm:text-4xl font-bold text-foreground mb-2 sm:mb-4">
               Land Based Carbon Calculator - Google Earth Engine
             </h1>
