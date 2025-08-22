@@ -1,20 +1,34 @@
 import { MapInterface } from "@/components/MapInterface";
+import geeLogoImage from "@/assets/google-earth-engine-logo.png";
 
 const Index = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto p-2 sm:p-4">
-        <div className="mb-4 sm:mb-8 text-center px-2">
-          <h1 className="text-2xl sm:text-4xl font-bold text-foreground mb-2 sm:mb-4">
-            Land Based Carbon Calculator - Google Earth Engine
-          </h1>
-          <p className="text-base sm:text-lg text-muted-foreground max-w-5xl mx-auto leading-relaxed">
-            Estimate carbon storage potential for land areas using satellite imagery and AI-powered analysis. 
-            To get started: <span className="font-semibold">zoom into an area on the map</span>, click 
-            <span className="font-semibold"> "Draw Area"</span> to draw a polygon around the area you want to measure, then 
-            click <span className="font-semibold">"Finish"</span> to receive detailed carbon storage 
-            estimates including above-ground biomass, below-ground biomass, and soil organic carbon values.
-          </p>
+        <div className="mb-4 sm:mb-8 px-2">
+          <div className="text-center mb-4">
+            <h1 className="text-2xl sm:text-4xl font-bold text-foreground mb-2 sm:mb-4">
+              Land Based Carbon Calculator - Google Earth Engine
+            </h1>
+          </div>
+          <div className="flex flex-col lg:flex-row items-center gap-6 max-w-6xl mx-auto">
+            <div className="flex-1">
+              <p className="text-base sm:text-lg text-muted-foreground leading-relaxed text-center lg:text-left">
+                Estimate carbon storage potential for land areas using satellite imagery and AI-powered analysis. 
+                To get started: <span className="font-semibold">zoom into an area on the map</span>, click 
+                <span className="font-semibold"> "Draw Area"</span> to draw a polygon around the area you want to measure, then 
+                click <span className="font-semibold">"Finish"</span> to receive detailed carbon storage 
+                estimates including above-ground biomass, below-ground biomass, and soil organic carbon values.
+              </p>
+            </div>
+            <div className="flex-shrink-0">
+              <img 
+                src={geeLogoImage} 
+                alt="Google Earth Engine Logo" 
+                className="w-32 sm:w-40 h-auto"
+              />
+            </div>
+          </div>
         </div>
         <div className="h-[calc(100vh-220px)] sm:h-[calc(100vh-280px)]">
           <MapInterface />
