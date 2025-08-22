@@ -33,7 +33,17 @@ const Index = () => {
             </div>
           </div>
         </div>
-        <div className={`transition-all duration-300 ${isSearchActive ? 'h-screen' : 'h-[calc(100vh-220px)] sm:h-[calc(100vh-280px)]'}`}>
+        <div className={`transition-all duration-500 ${isSearchActive ? 'h-screen fixed inset-0 z-50 bg-background' : 'h-[calc(100vh-220px)] sm:h-[calc(100vh-280px)]'}`}>
+          {isSearchActive && (
+            <div className="absolute top-4 left-4 right-4 z-10">
+              <button
+                onClick={() => setIsSearchActive(false)}
+                className="mb-2 px-3 py-1 bg-card border border-border rounded-md text-sm text-muted-foreground hover:bg-accent"
+              >
+                ← Back to main page
+              </button>
+            </div>
+          )}
           <MapInterface onSearchActive={setIsSearchActive} />
         </div>
         <div className="text-center py-4 border-t border-border mt-4">
