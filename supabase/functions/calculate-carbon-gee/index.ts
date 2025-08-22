@@ -6,6 +6,78 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Rate limiting cache (in-memory for edge function)
+const requestCache = new Map<string, { count: number; resetTime: number }>()
+
+// Input validation functions
+function validateGeometry(geometry: any): boolean {
+  if (!geometry || typeof geometry !== 'object') return false
+  if (!geometry.type || !geometry.coordinates) return false
+  if (!Array.isArray(geometry.coordinates)) return false
+  
+  // Check for reasonable coordinate bounds (latitude: -90 to 90, longitude: -180 to 180)
+  const coords = geometry.coordinates[0] || geometry.coordinates
+  if (!Array.isArray(coords)) return false
+  
+  for (const coord of coords) {
+    if (!Array.isArray(coord) || coord.length !== 2) return false
+    const [lng, lat] = coord
+    if (typeof lng !== 'number' || typeof lat !== 'number') return false
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return false
+  }
+  
+  return true
+}
+
+function validateAreaHectares(area: any): boolean {
+  if (typeof area !== 'number') return false
+  if (area <= 0 || area > 1000000) return false // Max 1M hectares
+  return true
+}
+
+function sanitizeInput(data: any): any {
+  // Remove any potentially malicious properties
+  const { geometry, areaHectares } = data
+  return { geometry, areaHectares }
+}
+
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now()
+  const windowMs = 60 * 1000 // 1 minute window
+  const maxRequests = 10 // Max 10 requests per minute per IP
+  
+  const clientData = requestCache.get(ip)
+  
+  if (!clientData || now > clientData.resetTime) {
+    // New window or expired window
+    requestCache.set(ip, { count: 1, resetTime: now + windowMs })
+    return true
+  }
+  
+  if (clientData.count >= maxRequests) {
+    return false // Rate limit exceeded
+  }
+  
+  clientData.count++
+  return true
+}
+
+async function logUsage(supabaseClient: any, ip: string, userAgent: string, endpoint: string, requestData: any) {
+  try {
+    await supabaseClient
+      .from('usage_analytics')
+      .insert([{
+        ip_address: ip,
+        user_agent: userAgent,
+        endpoint,
+        request_data: requestData
+      }])
+  } catch (error) {
+    console.error('Failed to log usage:', error)
+    // Don't throw - analytics shouldn't break the main functionality
+  }
+}
+
 interface GEECarbonData {
   total_co2e: number;
   above_ground_biomass: number;
@@ -32,25 +104,63 @@ serve(async (req) => {
   }
 
   try {
+    // Get client IP and User-Agent for security monitoring
+    const clientIP = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'
+    const userAgent = req.headers.get('user-agent') || 'unknown'
+    
+    // Check rate limiting
+    if (!checkRateLimit(clientIP)) {
+      console.log(`Rate limit exceeded for IP: ${clientIP}`)
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Rate limit exceeded. Please try again later.',
+          details: 'Too many requests from this IP address'
+        }),
+        { 
+          status: 429,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { geometry, areaHectares } = await req.json();
+    const requestData = await req.json();
+    
+    // Sanitize input
+    const sanitizedData = sanitizeInput(requestData);
+    const { geometry, areaHectares } = sanitizedData;
 
-    // Handle carbon calculation requests (geometry required)
+    // Validate required parameters
     if (!geometry || !areaHectares) {
       throw new Error('Missing required parameters: geometry and areaHectares');
     }
 
-    console.log('Processing direct polygon carbon calculation for area:', areaHectares, 'hectares');
+    // Validate input data
+    if (!validateGeometry(geometry)) {
+      throw new Error('Invalid geometry provided. Please check coordinate format and bounds.');
+    }
+
+    if (!validateAreaHectares(areaHectares)) {
+      throw new Error('Invalid area provided. Area must be between 0 and 1,000,000 hectares.');
+    }
+
+    // Log usage analytics
+    await logUsage(supabase, clientIP, userAgent, 'calculate-carbon-gee', {
+      area_hectares: areaHectares,
+      geometry_type: geometry.type,
+      coordinates_count: geometry.coordinates?.[0]?.length || 0
+    });
+
+    console.log(`Processing carbon calculation for ${areaHectares} hectares from IP: ${clientIP}`);
 
     // Calculate carbon using live GEE data
     const geeData = await calculateCarbonWithLiveGEE(geometry, areaHectares);
     console.log('GEE calculation completed:', geeData);
-
-    // No database storage for direct polygon calculations
 
     return new Response(
       JSON.stringify({
