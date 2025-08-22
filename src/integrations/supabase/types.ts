@@ -145,6 +145,15 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      get_analytics_summary: {
+        Args: { end_date?: string; start_date?: string }
+        Returns: {
+          avg_area_hectares: number
+          endpoint: string
+          request_count: number
+          unique_ips: number
+        }[]
+      }
       get_current_user_role: {
         Args: Record<PropertyKey, never>
         Returns: Database["public"]["Enums"]["app_role"]
