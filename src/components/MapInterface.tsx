@@ -26,7 +26,12 @@ interface CarbonCalculation {
 }
 
 
-export const MapInterface = () => {
+interface MapInterfaceProps {
+  isFullHeight?: boolean;
+  onSearchActive?: (isActive: boolean) => void;
+}
+
+export const MapInterface = ({ isFullHeight = false, onSearchActive }: MapInterfaceProps) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const justSelectedRef = useRef(false);
@@ -46,6 +51,7 @@ export const MapInterface = () => {
   const [isCalculating, setIsCalculating] = useState(false);
   const [mapboxToken, setMapboxToken] = useState<string>('');
   const [selectedBaseMap, setSelectedBaseMap] = useState<string>('satellite-streets');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
 
   // Initialize map with Mapbox token from Supabase
   useEffect(() => {
@@ -598,10 +604,18 @@ export const MapInterface = () => {
                   value={searchAddress}
                   onChange={(e) => setSearchAddress(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleAddressSearch()}
-                  onFocus={() => searchSuggestions.length > 0 && setShowSuggestions(true)}
+                  onFocus={() => {
+                    searchSuggestions.length > 0 && setShowSuggestions(true);
+                    setIsSearchFocused(true);
+                    onSearchActive?.(true);
+                  }}
                   onBlur={() => {
                     // Don't hide suggestions if user is clicking on them
-                    setTimeout(() => setShowSuggestions(false), 150);
+                    setTimeout(() => {
+                      setShowSuggestions(false);
+                      setIsSearchFocused(false);
+                      onSearchActive?.(false);
+                    }, 150);
                   }}
                   className="flex-1"
                 />

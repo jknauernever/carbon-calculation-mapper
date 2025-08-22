@@ -1,11 +1,14 @@
+import { useState } from "react";
 import { MapInterface } from "@/components/MapInterface";
 import geeLogoImage from "@/assets/google-earth-engine-logo.png";
 
 const Index = () => {
+  const [isSearchActive, setIsSearchActive] = useState(false);
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto p-2 sm:p-4">
-        <div className="mb-4 sm:mb-8 px-2">
+        <div className={`mb-4 sm:mb-8 px-2 transition-all duration-300 ${isSearchActive ? 'mb-2 sm:mb-4' : ''}`}>
           <div className="mb-4">
             <h1 className="text-2xl sm:text-4xl font-bold text-foreground mb-2 sm:mb-4">
               Land Based Carbon Calculator - Google Earth Engine
@@ -30,8 +33,8 @@ const Index = () => {
             </div>
           </div>
         </div>
-        <div className="h-[calc(100vh-220px)] sm:h-[calc(100vh-280px)]">
-          <MapInterface />
+        <div className={`transition-all duration-300 ${isSearchActive ? 'h-screen' : 'h-[calc(100vh-220px)] sm:h-[calc(100vh-280px)]'}`}>
+          <MapInterface onSearchActive={setIsSearchActive} />
         </div>
         <div className="text-center py-4 border-t border-border mt-4">
           <p className="text-xs text-muted-foreground">
