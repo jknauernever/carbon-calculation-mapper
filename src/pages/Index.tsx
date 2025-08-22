@@ -6,7 +6,7 @@ const Index = () => {
       <div className="container mx-auto p-2 sm:p-4">
         <div className="mb-4 sm:mb-8 text-center px-2">
           <h1 className="text-2xl sm:text-4xl font-bold text-foreground mb-2 sm:mb-4">
-            Land-Based Carbon Calculator
+            Land Based Carbon Calculator - Google Earth Engine
           </h1>
           <p className="text-base sm:text-lg text-muted-foreground max-w-5xl mx-auto leading-relaxed">
             Estimate carbon storage potential for land areas using satellite imagery and AI-powered analysis. 
