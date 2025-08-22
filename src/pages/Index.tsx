@@ -25,7 +25,7 @@ const Index = () => {
               <img 
                 src={geeLogoImage} 
                 alt="Google Earth Engine Logo" 
-                className="w-32 sm:w-40 h-auto"
+                className="w-20 sm:w-24 h-auto"
               />
             </div>
           </div>
